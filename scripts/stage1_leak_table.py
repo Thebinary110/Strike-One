@@ -81,7 +81,27 @@ def run_cell(pool, train_mask, eval_mask, agg_cols, drop_cols, n_estimators):
     clf = lgb.LGBMClassifier(**params)
     clf.fit(X_tr, train_df["isFraud"], categorical_feature=cats)
     s = clf.predict_proba(X_ev)[:, 1]
-    return eval_df["isFraud"].to_numpy(), s
+
+    # Null verification: the aggregate columns must have actually reached
+    # the model — present, non-constant, largely non-null — and their gain
+    # is reported so "no lift" can be told apart from "never used".
+    gain = dict(zip(cols, clf.booster_.feature_importance("gain")))
+    total_gain = sum(gain.values())
+    agg_diag = {}
+    for c in agg_cols:
+        col = X_tr[c]
+        assert col.nunique(dropna=True) > 1, f"{c} is constant"
+        agg_diag[c] = {
+            "nonnull_frac_train": round(float(col.notna().mean()), 4),
+            "nonnull_frac_eval": round(float(X_ev[c].notna().mean()), 4),
+            "n_unique_train": int(col.nunique(dropna=True)),
+            "gain": round(float(gain[c]), 1),
+            "gain_share": round(float(gain[c] / total_gain), 5),
+            "gain_rank": int(
+                sorted(gain.values(), reverse=True).index(gain[c]) + 1
+            ),
+        }
+    return eval_df["isFraud"].to_numpy(), s, agg_diag
 
 
 def ci(y, s, fn):
@@ -113,6 +133,7 @@ def main():
 
     cells = {}
     scores = {}
+    agg_diags = {}
     for split_name, eval_mask in [("random", rand_eval), ("chrono", chrono_eval)]:
         for agg_name, keep, drop in [
             ("whole", wd_cols, pit_cols),
@@ -120,8 +141,10 @@ def main():
         ]:
             key = f"{split_name}+{agg_name}"
             print(f"training cell {key} ...")
-            y, s = run_cell(pool, ~eval_mask, eval_mask, keep, drop, n_estimators)
+            y, s, diag = run_cell(pool, ~eval_mask, eval_mask, keep, drop, n_estimators)
             scores[key] = (y, s)
+            agg_diags[key] = diag
+            print(f"  agg diagnostics: {json.dumps(diag)}")
             ap = ci(y, s, M.average_precision)
             auc = ci(y, s, M.roc_auc)
             cells[key] = {"ap": ap, "roc_auc": auc, "n_eval": len(y)}
@@ -158,6 +181,7 @@ def main():
         }
 
     out = {"cells": cells, "paired_whole_vs_pit": paired, "decomposition": decomp,
+           "agg_diagnostics": agg_diags,
            "n_estimators": n_estimators, "n_boot": N_BOOT}
     (OUT / "leak_table.json").write_text(json.dumps(out, indent=2, default=float))
 

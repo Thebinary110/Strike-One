@@ -95,6 +95,80 @@
       "total_inflation (random+whole - chrono+pit)": 0.039575018062582346
     }
   },
+  "agg_diagnostics": {
+    "random+whole": {
+      "wd_card1_count": {
+        "nonnull_frac_train": 1.0,
+        "nonnull_frac_eval": 1.0,
+        "n_unique_train": 467,
+        "gain": 17568.8,
+        "gain_share": 0.02349,
+        "gain_rank": 8
+      },
+      "wd_card1_amt_mean": {
+        "nonnull_frac_train": 1.0,
+        "nonnull_frac_eval": 1.0,
+        "n_unique_train": 8337,
+        "gain": 24408.6,
+        "gain_share": 0.03264,
+        "gain_rank": 5
+      }
+    },
+    "random+pit": {
+      "pit_card1_count": {
+        "nonnull_frac_train": 1.0,
+        "nonnull_frac_eval": 1.0,
+        "n_unique_train": 11886,
+        "gain": 12769.4,
+        "gain_share": 0.01715,
+        "gain_rank": 14
+      },
+      "pit_card1_amt_mean": {
+        "nonnull_frac_train": 0.9726,
+        "nonnull_frac_eval": 0.9741,
+        "n_unique_train": 353391,
+        "gain": 17326.6,
+        "gain_share": 0.02327,
+        "gain_rank": 7
+      }
+    },
+    "chrono+whole": {
+      "wd_card1_count": {
+        "nonnull_frac_train": 1.0,
+        "nonnull_frac_eval": 1.0,
+        "n_unique_train": 467,
+        "gain": 18002.9,
+        "gain_share": 0.02376,
+        "gain_rank": 8
+      },
+      "wd_card1_amt_mean": {
+        "nonnull_frac_train": 1.0,
+        "nonnull_frac_eval": 1.0,
+        "n_unique_train": 8257,
+        "gain": 23947.3,
+        "gain_share": 0.03161,
+        "gain_rank": 5
+      }
+    },
+    "chrono+pit": {
+      "pit_card1_count": {
+        "nonnull_frac_train": 1.0,
+        "nonnull_frac_eval": 1.0,
+        "n_unique_train": 9670,
+        "gain": 11400.9,
+        "gain_share": 0.01509,
+        "gain_rank": 17
+      },
+      "pit_card1_amt_mean": {
+        "nonnull_frac_train": 0.9691,
+        "nonnull_frac_eval": 0.9915,
+        "n_unique_train": 349265,
+        "gain": 15936.3,
+        "gain_share": 0.0211,
+        "gain_rank": 10
+      }
+    }
+  },
   "n_estimators": 391,
   "n_boot": 1000
 }

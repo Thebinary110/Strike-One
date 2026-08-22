@@ -49,6 +49,17 @@ D-columns are "days since X" timedeltas; public solutions often use
 baseline, standard practice). If Stage 2's entity features underperform,
 this is the first cheap variant to test — est. 1h. **Status: logged.**
 
+## P-007 — Holdout descriptive stats read from the raw stream, not the seal
+Stage 2's entity-novelty deliverable needs holdout rows (label-free:
+UID/card1/addr1/email/DeviceInfo values only). Reading them via
+`seal.load_holdout` would burn an access-log entry that Stage 7 expects to
+be unique. Decision: descriptive, label-free statistics are computed from
+the raw CSV stream (exactly as Stage 0's slice table was); **no holdout
+label is read anywhere before Stage 7**, and the sealed parquet + log are
+untouched. The seal's object is the *evaluation* (labels/scores), not the
+existence of covariates that were always on disk. Stated in STAGE_2.md.
+**Status: adopted.**
+
 ## P-003 — Integer-day convention for split membership
 `day = TransactionDT/86400` is float (1.000–182.999). Slice membership uses
 `day_idx = floor(day)`, inclusive bounds, so every row belongs to exactly

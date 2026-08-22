@@ -1,0 +1,121 @@
+{
+  "resolution": [
+    {
+      "slice": "train",
+      "rows": 389523,
+      "resolved_lv3": 0.8881,
+      "d1_null_lv2": 0.0006,
+      "addr1_null_lv1": 0.1113,
+      "uid_cardinality": 144949,
+      "txns_per_uid_mean": 2.39,
+      "txns_per_uid_p50": 1.0,
+      "txns_per_uid_p90": 5.0,
+      "txns_per_uid_p99": 16.0,
+      "txns_per_uid_max": 300,
+      "share_singleton_uids": 0.5913
+    },
+    {
+      "slice": "val",
+      "rows": 79954,
+      "resolved_lv3": 0.8879,
+      "d1_null_lv2": 0.0101,
+      "addr1_null_lv1": 0.102,
+      "uid_cardinality": 39639,
+      "txns_per_uid_mean": 1.79,
+      "txns_per_uid_p50": 1.0,
+      "txns_per_uid_p90": 3.0,
+      "txns_per_uid_p99": 9.0,
+      "txns_per_uid_max": 58,
+      "share_singleton_uids": 0.6527
+    },
+    {
+      "slice": "holdout",
+      "rows": 92427,
+      "resolved_lv3": 0.8951,
+      "d1_null_lv2": 0.0004,
+      "addr1_null_lv1": 0.1044,
+      "uid_cardinality": 43469,
+      "txns_per_uid_mean": 1.9,
+      "txns_per_uid_p50": 1.0,
+      "txns_per_uid_p90": 4.0,
+      "txns_per_uid_p99": 10.0,
+      "txns_per_uid_max": 1395,
+      "share_singleton_uids": 0.6384
+    }
+  ],
+  "novelty": [
+    {
+      "slice": "val",
+      "key": "uid",
+      "null_rate": 0.1121,
+      "novel_vs_train": 0.5236,
+      "novel_vs_all_prior": 0.4922
+    },
+    {
+      "slice": "val",
+      "key": "card1",
+      "null_rate": 0.0,
+      "novel_vs_train": 0.0121,
+      "novel_vs_all_prior": 0.0112
+    },
+    {
+      "slice": "val",
+      "key": "addr1",
+      "null_rate": 0.102,
+      "novel_vs_train": 0.0003,
+      "novel_vs_all_prior": 0.0003
+    },
+    {
+      "slice": "val",
+      "key": "P_emaildomain",
+      "null_rate": 0.1583,
+      "novel_vs_train": 0.0,
+      "novel_vs_all_prior": 0.0
+    },
+    {
+      "slice": "val",
+      "key": "DeviceInfo",
+      "null_rate": 0.862,
+      "novel_vs_train": 0.0276,
+      "novel_vs_all_prior": 0.0252
+    },
+    {
+      "slice": "holdout",
+      "key": "uid",
+      "null_rate": 0.1049,
+      "novel_vs_train": 0.6482,
+      "novel_vs_all_prior": 0.5165
+    },
+    {
+      "slice": "holdout",
+      "key": "card1",
+      "null_rate": 0.0,
+      "novel_vs_train": 0.0144,
+      "novel_vs_all_prior": 0.0107
+    },
+    {
+      "slice": "holdout",
+      "key": "addr1",
+      "null_rate": 0.1044,
+      "novel_vs_train": 0.0,
+      "novel_vs_all_prior": 0.0
+    },
+    {
+      "slice": "holdout",
+      "key": "P_emaildomain",
+      "null_rate": 0.1807,
+      "novel_vs_train": 0.0,
+      "novel_vs_all_prior": 0.0
+    },
+    {
+      "slice": "holdout",
+      "key": "DeviceInfo",
+      "null_rate": 0.8305,
+      "novel_vs_train": 0.0375,
+      "novel_vs_all_prior": 0.0181
+    }
+  ],
+  "val_fraud_rate_novel_uid": 0.031204605369344166,
+  "val_fraud_rate_seen_uid": 0.038569424964936885,
+  "val_positive_share_on_novel_uid": 0.4128113879003559
+}

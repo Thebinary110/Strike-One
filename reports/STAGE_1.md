@@ -127,27 +127,53 @@ Paired bootstrap on shared eval rows (whole vs point-in-time):
 | under random split | +0.0114 | [+0.0084, +0.0147] | 0.000 |
 | under chronological split | −0.0009 | [−0.0052, +0.0034] | 0.651 |
 
-### Reading, carefully
+### Reading, carefully — the claim, no wider than the evidence
 
 1. **A random split inflates AP by +0.22 — 39% relative — on the identical
    feature set.** Anyone reporting random-CV numbers on this dataset is
    reporting the top-left row. The ROC-AUC inflation (+0.04) looks small
    only because AUC compresses near 1; in AP terms the honest number is
    0.57, not 0.80.
-2. **The aggregation leak, with label-free aggregates, is zero under a
-   chronological split** (−0.0009, CI spans zero). The famous whole-dataset
-   count features are *only* exploitable under a random split (+0.0114
-   there, decisively non-zero) — the "magic feature" and the broken split
-   protocol are the same phenomenon, not two separate tricks.
-3. **Scope honestly stated:** this decomposition is for *behavioural*
+2. **What the two card1 aggregates support:** behavioural entity
+   aggregates of this minimal kind carry no independent signal under a
+   correct chronological split (−0.0009, CI spans zero); their apparent
+   value under a random split (+0.0114, decisively non-zero) is
+   entity-overlap memorisation — and label propagation makes that
+   memorisation near-total, because once a card is positive it stays
+   positive, so any of its training rows reveal the labels of the rest.
+3. **What they do NOT support:** any claim about the competition's UID
+   aggregation family (~45 features, validated under month-wise
+   GroupKFold, worth +0.011 AUC there). Whether *that* lift survives a
+   correct chronological split is a Stage 2 experiment, not a Stage 1
+   conclusion.
+4. **Scope honestly stated:** this decomposition is for *behavioural*
    (label-free) aggregates. Label-derived aggregates (target encodings)
    are a different, larger hazard — they carry the delay/leak asymmetry
    invariant 3 exists for — and were deliberately not tested here because
    the minimal-aggregate design isolates the split effect cleanly.
-4. Incidental: point-in-time card1 count/mean added ~nothing over Baseline
-   A under the honest protocol (0.5734 → 0.5734). Consistent with the
-   brief's Stage 2 calibration (V-columns already encode entity relations);
+5. Incidental: point-in-time card1 count/mean added ~nothing over Baseline
+   A under the honest protocol (0.5734 → 0.5734, but see the null
+   verification below). Consistent with the brief's Stage 2 calibration;
    foreshadows that Stage 2's gate is a real hurdle, not a formality.
+
+### Null verification (the 0.5734 → 0.5734 coincidence)
+
+Identical-to-four-decimals is also the signature of features that never
+reached the model, so the run was repeated with reached-the-model
+diagnostics per cell (now permanent in the script; all four cell metrics
+reproduced exactly, confirming determinism). In the honest cell:
+
+| Feature | non-null (train/eval) | unique | gain share | gain rank /439 |
+|---|---|---:|---:|---:|
+| pit_card1_count | 100% / 100% | 9,670 | 1.5% | 17 |
+| pit_card1_amt_mean | 96.9% / 99.2% | 349,265 | 2.1% | 10 |
+
+The aggregates were present, non-constant, near-fully populated, and the
+model gave them top-20 gain out of 439 features — and AP still did not
+move. The null is "**used but redundant**" (the model reallocated splits it
+would otherwise have spent on C/V-columns), not "silently dropped". In the
+random cells the same features rank 5–14, consistent with the
+memorisation reading.
 
 Raw numbers: `stage1/leak_table.json`; screenshot table:
 `stage1/leak_table.md`.
