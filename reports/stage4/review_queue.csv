@@ -1,0 +1,4 @@
+capacity_per_day,k_total,queue_precision,fs_catches_in_queue,card_precision_at_k
+5,140,0.2357,6,0.3357
+20,560,0.2036,34,0.2696
+50,1400,0.15,80,0.215

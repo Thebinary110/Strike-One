@@ -79,13 +79,18 @@ strikes — which is the point.
 ¹ FS precision = FS catches / total alerts = friction efficiency (same
 quantity, named once).
 
-**The quotable pair: a UID blocklist with no model achieves 54.2%
-transaction precision — statistically the same as Baseline A's 54.4% with
-437 features — while preventing zero loss.** Transaction precision cannot
-tell a fraud-preventer from a fraud-rememberer. And B, the model that
-"wins" the headline (AP 0.748 vs 0.573), redirects 407 alerts from fresh
-fraud and legitimate customers toward entities a blocklist already covers
-(redundant 939 → 1,346).
+**The quotable pair (budget-matched at the blocklist's own N=1,711): a
+UID blocklist with no model achieves 54.2% transaction precision — enough
+to look respectable on any precision dashboard — while catching zero
+first strikes by construction. Baseline A at the same 1,711 budget
+reaches 73.1% precision and catches 525 first strikes.** (An earlier
+draft compared A at budget 2,810 — 54.4% — against the blocklist at
+1,711; that comparison was not budget-matched and is retired.) Meanwhile
+B at 1,711 posts 90.5% precision with *lower* first-strike recall than A
+(0.397 vs 0.505): precision rises as prevention falls. And at 2,810, B —
+the model that "wins" the headline (AP 0.748 vs 0.573) — redirects 407
+alerts from fresh fraud and legitimate customers toward entities a
+blocklist already covers (redundant 939 → 1,346).
 
 First-strike recall with uid-cluster bootstrap CIs, and paired deltas
 vs A (primary budget):
@@ -122,7 +127,9 @@ the queue re-flagging known entities. Only at very loose budgets (8,000 ≈
 ## B. Does the UID family buy first-strike recall? No.
 
 ΔFS-recall(A+fam − A) = −0.003 [−0.016, +0.009], p = 0.698. The family's
-marginal +0.0048 AP buys **zero first-strike value**. Once the propagation
+transaction-level effect (+0.0048 AP, lower CI bound exactly 0.0000) is
+**not distinguishable from zero**, and it buys **zero first-strike
+value**. Once the propagation
 artifact is stripped out, relational entity history contributes nothing to
 catching new fraud on this dataset — the cleanest available answer to
 whether "relational intelligence" was ever about prevention here.
@@ -139,6 +146,18 @@ Entities split by "UID seen before day 120" (all prior data):
 - **The known-entity segment is a blocklist's world**: 13 first strikes
   vs 878 propagated positives; a blocklist alone recovers 92.8% of its
   positives; every model's interventions there are ≥99% redundant.
+- **The 98.8% figure, with its denominator and definitional coupling
+  stated**: a known entity can only produce a val first strike if it was
+  clean through day 119 — and 158,106 of 163,892 known UIDs were. Of the
+  18,483 clean known UIDs active in validation, **13 struck (onset rate
+  0.07%)**; of 24,325 novel UIDs, **1,027 struck (4.22%)** — a **60×
+  onset-rate difference** that survives the coupling.
+- **The fallback (null-addr1) stratum is a segment of its own**: fraud
+  rate **12.9% in val vs 2.45%** for resolved entities (10.9% vs 2.5% in
+  train), and it hosts 487 of 1,026 attributable first strikes on 10.2%
+  of rows. A missing billing address is itself a strong signal, and a
+  segment with a 5× base rate plausibly wants its own policy (Stage 4
+  input).
 - **The novel-entity segment is where prevention happens**: 98.8% of
   first strikes, no history, transaction features only.
 - Policy implication for Stage 4: score-driven intervention earns its
@@ -164,10 +183,12 @@ Same scores, roles recomputed under three keys:
   moves, and B's redundancy rate exceeds A's.
 - **One secondary claim is key-dependent and reported as such**: "B is
   significantly *worse* at first strikes" holds under uid (CI excludes
-  zero) and directionally under card1, but the sign flips (+2.7pp, no CI
-  computed) under card1+email. The defensible form across all keys is:
-  **"B is no better at first strikes under any key, and significantly
-  worse under the primary key."**
+  zero) and directionally under card1, but the sign flips under
+  card1+email: +0.0269 [−0.0062, +0.0604], p(no improvement) = 0.073 —
+  a CI straddling zero (cluster bootstrap by that key's entities;
+  computed at the Stage 4 gate's request). The defensible form across all
+  keys is: **"B is no better at first strikes under any key, and
+  significantly worse under the primary key."**
 - Coarser keys collapse friction efficiency (0.21 → 0.03) by inflating
   propagated counts — the choice of propagation key moves magnitudes a
   lot, which is why every episode number in this project names its key.

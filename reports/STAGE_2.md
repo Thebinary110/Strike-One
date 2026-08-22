@@ -111,10 +111,11 @@ features `uidagg_TransactionAmt_mean` and D-column means.
 | AP | 0.5734 [0.5544, 0.5907] | 0.5782 [0.5588, 0.5954] | +0.0048 [+0.0000, +0.0101] | 0.025 |
 | ROC-AUC | 0.9184 | 0.9209 | +0.0025 [+0.0002, +0.0046] | 0.016 |
 
-**Verdict: the famous lift survives a correct temporal split only
-marginally — +0.0048 AP with a CI touching zero, +0.0025 AUC against the
-published +0.011 under month-wise GroupKFold** (roughly a fifth of its
-advertised size). It is behavioural and delay-free, but small, because
+**Verdict: under a correct temporal split the famous lift is not
+distinguishable from zero on AP (+0.0048, lower CI bound exactly 0.0000);
+the AUC effect is +0.0025, barely excluding zero, against the published
++0.011 under month-wise GroupKFold** (roughly a fifth of its advertised
+size). It is behavioural and delay-free, but small, because
 over half the evaluation rows have no history for it to aggregate. This
 retires the Stage 1 overreach in both directions: the family is not
 leak-only, and its reputation was substantially a GroupKFold
@@ -158,10 +159,15 @@ variant lost to A in every one of 1,000 resamples — not a typo.
   [−0.0798, −0.0520] within the known-entity segment and +0.0005 (nil) on
   novel entities**. Windowed behavioural history misleads precisely where
   it is *populated* — train-period regulars' patterns do not transfer —
-  and is inert where absent. Entity behavioural history here isn't merely
-  useless; where it exists, it is harmful. (The UID family's marginal
-  +0.005 shows *expanding lifetime* aggregates avoid this where *short
-  windows* do not.)
+  and is inert where absent. The deeper reason reinforces the thesis:
+  **within known entities the label is determined by propagation history,
+  not behaviour** — once an entity is flagged, its later rows are fraud by
+  rule — so behavioural windows carry no label-relevant information there
+  and actively compete for splits with the one feature that does.
+  Behaviour doesn't matter for known entities on this benchmark *because
+  the label doesn't depend on it*. (The UID family's
+  not-distinguishable-from-zero +0.005 shows *expanding lifetime*
+  aggregates at least avoid the harm where *short windows* do not.)
 - **The label-derived gain is the labeling rule, not intelligence.**
   `lab_uid_fraud_rate` is B's top feature at gain 145,507 — 1.7× Baseline
   A's strongest feature. The host labels every transaction after an

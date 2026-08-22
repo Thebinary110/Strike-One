@@ -1,0 +1,50 @@
+{
+  "A_at_blocklist_budget": {
+    "budget": 1711,
+    "txn_precision": 0.7306,
+    "fs_recall": 0.5048,
+    "fs_catches": 525
+  },
+  "B_at_blocklist_budget": {
+    "budget": 1711,
+    "txn_precision": 0.9047,
+    "fs_recall": 0.3971,
+    "fs_catches": 413
+  },
+  "blocklist": {
+    "budget": 1711,
+    "txn_precision": 0.5424,
+    "fs_recall": 0.0,
+    "fs_catches": 0
+  },
+  "card1_email_fs_delta_B_minus_A": [
+    0.026865671641791045,
+    -0.006193401702786339,
+    0.060422960725075525,
+    0.073
+  ],
+  "novelty_denominators": {
+    "known_uids_pre_val": 163892,
+    "known_uids_clean_through_119": 158106,
+    "known_clean_uids_active_in_val": 18483,
+    "fs_episodes_on_known": 13,
+    "onset_rate_known_clean_active": 0.0007,
+    "novel_uids_in_val": 24325,
+    "fs_episodes_on_novel": 1027,
+    "onset_rate_novel": 0.04222
+  },
+  "fallback_train": {
+    "rows": 43361,
+    "share": 0.1113,
+    "fraud_rate_fallback": 0.1086,
+    "fraud_rate_resolved": 0.025
+  },
+  "fallback_val": {
+    "rows": 8157,
+    "share": 0.102,
+    "fraud_rate_fallback": 0.1288,
+    "fraud_rate_resolved": 0.0245,
+    "fs_episodes_fallback": 487,
+    "fs_episodes_resolved": 539
+  }
+}

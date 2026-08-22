@@ -1,0 +1,69 @@
+{
+  "lane1_share_train": 0.0116,
+  "lane1_share_val": 0.0214,
+  "lane1_positive_share_train": 0.2039,
+  "lane1_positive_share_val": 0.3302,
+  "val_fs_rows_in_lane1": 0,
+  "val_fs_rows_total": 1040,
+  "a2_best_iteration": 215,
+  "lane2_ap_A": 0.5742,
+  "lane2_ap_A2": 0.5881,
+  "lane2_auc_A": 0.9231,
+  "lane2_auc_A2": 0.9421,
+  "curve": [
+    {
+      "budget": 500,
+      "fs_recall_A": 0.2481,
+      "fs_recall_A2": 0.2462,
+      "friction_eff_A": 0.516,
+      "friction_eff_A2": 0.512
+    },
+    {
+      "budget": 1000,
+      "fs_recall_A": 0.4413,
+      "fs_recall_A2": 0.4529,
+      "friction_eff_A": 0.459,
+      "friction_eff_A2": 0.471
+    },
+    {
+      "budget": 1500,
+      "fs_recall_A": 0.5154,
+      "fs_recall_A2": 0.5163,
+      "friction_eff_A": 0.3573,
+      "friction_eff_A2": 0.358
+    },
+    {
+      "budget": 2000,
+      "fs_recall_A": 0.5481,
+      "fs_recall_A2": 0.5529,
+      "friction_eff_A": 0.285,
+      "friction_eff_A2": 0.2875
+    },
+    {
+      "budget": 2810,
+      "fs_recall_A": 0.5856,
+      "fs_recall_A2": 0.6038,
+      "friction_eff_A": 0.2167,
+      "friction_eff_A2": 0.2235,
+      "fs_delta_A2_minus_A": [
+        0.0183,
+        0.0068,
+        0.0297,
+        0.002
+      ],
+      "ap_delta_A2_minus_A": [
+        0.0139,
+        0.0079,
+        0.0205,
+        0.0
+      ]
+    },
+    {
+      "budget": 4000,
+      "fs_recall_A": 0.6298,
+      "fs_recall_A2": 0.65,
+      "friction_eff_A": 0.1638,
+      "friction_eff_A2": 0.169
+    }
+  ]
+}

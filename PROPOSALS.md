@@ -60,6 +60,26 @@ untouched. The seal's object is the *evaluation* (labels/scores), not the
 existence of covariates that were always on disk. Stated in STAGE_2.md.
 **Status: adopted.**
 
+## P-008 — Episode-aware cost convention
+An entity is stopped at the system's first BLOCK of any of its rows;
+step-up does not stop an episode (conservative; a step-up that catches
+fraud plausibly triggers blocklisting, so this understates every system's
+downstream prevention — symmetrically). Post-stop rows are forced blocks:
+later fraud costs 0, later legit costs m·A. **Status: adopted (Stage 4).**
+
+## P-009 — Two accountings for two-lane vs single-lane, both reported
+Total-intervention parity (every block counted) is the harder test and
+two-lane loses it at tight totals; model-friction accounting (the
+blocklist runs anyway, automated, consuming no analyst alerts) is the
+deployment reality and two-lane wins it. Reporting only one would be
+spin in either direction. **Status: adopted.**
+
+## P-010 — Fallback (null-addr1) stratum kept inside lane 2
+Its 12.9% fraud rate argues for a dedicated policy segment, but a third
+lane adds a moving part days before the freeze; the model sees addr1
+nullness directly. Logged as future work with the measured base rates.
+**Status: deferred, recorded.**
+
 ## P-003 — Integer-day convention for split membership
 `day = TransactionDT/86400` is float (1.000–182.999). Slice membership uses
 `day_idx = floor(day)`, inclusive bounds, so every row belongs to exactly

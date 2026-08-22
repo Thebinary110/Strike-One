@@ -1,0 +1,50 @@
+{
+  "central": {
+    "m": 0.15,
+    "a": 0.125,
+    "e": 0.775,
+    "c_h": 30.0,
+    "two-lane+A2 (ours)": 139458.0,
+    "single-lane B (headline pick)": 136119.0,
+    "single-lane A": 180354.0,
+    "blocklist-only": 368102.0,
+    "approve-all": 557056.0,
+    "delta_headline_minus_ours_per_1k": -41.8,
+    "delta_pct_of_volume": -0.031
+  },
+  "ours_beats_headline_share_of_grid": 0.3333333333333333,
+  "delta_per_1k_min_max": [
+    -186.9,
+    76.5
+  ],
+  "vanishing_corner": {
+    "m": 0.25,
+    "a": 0.2,
+    "e": 0.95,
+    "c_h": 60.0,
+    "two-lane+A2 (ours)": 177915.0,
+    "single-lane B (headline pick)": 162969.0,
+    "single-lane A": 222277.0,
+    "blocklist-only": 430507.0,
+    "approve-all": 641356.0,
+    "delta_headline_minus_ours_per_1k": -186.9,
+    "delta_pct_of_volume": -0.139
+  },
+  "n_val_rows": 79954,
+  "val_volume": 10788560.0,
+  "demo_counters_ours": {
+    "fs_catches": 843,
+    "fs_amount_stopped": 125336.2421875,
+    "downstream_prevented_amount": 168719.859375,
+    "loss_prevented_at_strike_one_total": 294056.09375,
+    "redundant_interventions": 1573,
+    "interventions_total": 15222
+  },
+  "demo_counters_headline": {
+    "fs_catches": 851,
+    "fs_amount_stopped": 124780.734375,
+    "downstream_prevented_amount": 169709.5,
+    "redundant_interventions": 682,
+    "interventions_total": 15523
+  }
+}

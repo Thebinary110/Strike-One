@@ -1,0 +1,91 @@
+{
+  "selection_delta_A2_minus_A_fs_recall": [
+    0.018269230769230704,
+    0.006769011454623627,
+    0.029657289444860853,
+    0.002
+  ],
+  "selected_scorer": "A2",
+  "selection_rule": "A2 iff paired FS-recall delta CI at primary budget excludes zero in its favour; else A",
+  "headline_ap_full_val": {
+    "A": 0.5734,
+    "B": 0.7478
+  },
+  "lane1_size": 1711,
+  "brier": {
+    "raw": 0.014019108184790893,
+    "isotonic": 0.013815428159481336,
+    "platt": 0.014012350124758172
+  },
+  "calibration_choice": "isotonic",
+  "central_point": {
+    "m": 0.15,
+    "a": 0.125,
+    "e": 0.775,
+    "c_h": 30.0,
+    "cost_policy": 133311.0,
+    "cost_fixed_threshold": 195378.0,
+    "cost_amount_blind": 133522.0,
+    "cost_headline_B_system": 125816.0,
+    "cost_trivial": 557056.0,
+    "trivial": "approve-all",
+    "savings_vs_trivial": 0.7607,
+    "gap_vs_fixed": 0.1114,
+    "gap_vs_amount_blind": 0.0004,
+    "delta_headline_minus_ours_per_1k_txn": -93.7,
+    "mix_approve": 0.827,
+    "mix_stepup": 0.154,
+    "mix_block": 0.018
+  },
+  "grid_summary": {
+    "savings_vs_trivial_min_max": [
+      0.6168,
+      0.9332
+    ],
+    "policy_beats_fixed_threshold_share": 1.0,
+    "policy_beats_amount_blind_share": 0.6790123456790124,
+    "delta_per_1k_min_max": [
+      -212.7,
+      51.6
+    ],
+    "worst_corner_vs_fixed": {
+      "m": 0.15,
+      "a": 0.2,
+      "e": 0.6,
+      "c_h": 30.0,
+      "cost_policy": 183368.0,
+      "cost_fixed_threshold": 195378.0,
+      "cost_amount_blind": 176408.0,
+      "cost_headline_B_system": 171228.0,
+      "cost_trivial": 557056.0,
+      "trivial": "approve-all",
+      "savings_vs_trivial": 0.6708,
+      "gap_vs_fixed": 0.0216,
+      "gap_vs_amount_blind": -0.0125,
+      "delta_headline_minus_ours_per_1k_txn": -151.8,
+      "mix_approve": 0.89,
+      "mix_stepup": 0.081,
+      "mix_block": 0.029
+    },
+    "worst_corner_headline_delta": {
+      "m": 0.25,
+      "a": 0.2,
+      "e": 0.95,
+      "c_h": 60.0,
+      "cost_policy": 171215.0,
+      "cost_fixed_threshold": 252386.0,
+      "cost_amount_blind": 162676.0,
+      "cost_headline_B_system": 154212.0,
+      "cost_trivial": 641356.0,
+      "trivial": "approve-all",
+      "savings_vs_trivial": 0.733,
+      "gap_vs_fixed": 0.1266,
+      "gap_vs_amount_blind": -0.0133,
+      "delta_headline_minus_ours_per_1k_txn": -212.7,
+      "mix_approve": 0.872,
+      "mix_stepup": 0.116,
+      "mix_block": 0.011
+    }
+  },
+  "frozen_config_sha256": "b632a136a43e5d610901ac5bd24be402914ca3c28ec06a584e7c15a78ee0d9b3"
+}

@@ -4,6 +4,41 @@ An episode-aware card-not-present fraud risk engine, built on the IEEE-CIS
 Fraud Detection dataset for the Razorpay AI Buildathon (AI Risk Manager
 track). Strictly defense-only.
 
+## The claim
+
+On the most widely used **public** benchmark for card fraud, the standard
+evaluation cannot distinguish *preventing* fraud from *remembering* it —
+and it systematically prefers the model that remembers. **At a 500-alert
+budget, the higher-AP model catches 2.7× fewer first strikes (7.9% vs
+21.0% first-strike recall; friction efficiency 0.16 vs 0.44).** A
+scoreless blocklist reaches 54% transaction precision while preventing
+nothing; adding the entity-history features everyone adds buys +0.17 AP
+while *reducing* first-strike recall with a confidence interval that
+excludes zero. Every piece is measured under a chronological protocol,
+paired-tested, and key-sensitivity-checked.
+
+**Generalisation bridge — hypothesis, not measurement:** label
+propagation is not a quirk of this dataset's annotation; it is what any
+chargeback-derived label set looks like, because real blocklists work the
+same way. Any team training on chargeback-derived labels against a
+transaction-level metric is exposed to the same distortion. We measured
+it on one public benchmark; we did not measure it on anyone's production
+data, and we say so.
+
+## The audit that validates the method
+
+Midway through, a check built to rule out one failure mode (entity
+fragmentation) caught a different one: a pandas-3 behaviour change had
+silently nulled the entity id on 11.4% of rows, and each null-entity
+fraud was being counted as its own "first strike" — **inflating our own
+headline metric by ~55%** (1,610 apparent first-strike episodes; 1,040
+real ones). The bug was found *because* the pipeline audits its own
+central number, fixed, regression-tested, and every affected result was
+rebuilt and corrected in place (`reports/STAGE_2.md` carries the banner;
+git history preserves the originals). We keep this story at the top
+because it is the strongest evidence we can offer that the numbers below
+survive hostile reading.
+
 ## Read the limitations first
 
 This project's claims are only as strong as these caveats, so they come
