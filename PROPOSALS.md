@@ -25,6 +25,30 @@ neighbours), but it is discarded, not fitted or evaluated on, so it biases
 nothing — worth a sentence in the final report. Val (28d) and holdout (32d)
 each span 4 full weekly cycles. **Cost:** 0.5h (done). **Status: adopted.**
 
+## P-004 — High-cardinality numeric IDs treated as numeric, not categorical
+`card1` (~13k values), `card2/3/5`, `addr1/2` arrive as numerics. LightGBM's
+native categorical handling on 10k+ categories overfits small leaves; the
+numeric treatment is the common published baseline and keeps Baseline A
+modest. String columns (31 of them) use native categoricals with
+train-fitted vocabularies; unseen values map to missing, never to a fresh
+code. **Cost:** 0h. **Alternative logged:** CatBoost ordered target
+encoding — only worth a paired comparison if Stage 2 lift is marginal.
+**Status: adopted for Stage 1.**
+
+## P-005 — Leak table: fixed capacity, sanctioned random split
+The 2x2 uses a random split, which invariant 1 bans for modeling; here it
+is the *object of study*, labeled as such, in a standalone script nothing
+downstream consumes. All four cells train at Baseline A's early-stopped
+capacity (391 trees) with no early stopping, so no cell benefits from
+eval-set model selection and the deltas isolate the leaks, not tuning.
+**Status: adopted (Stage 1).**
+
+## P-006 — D-column normalization deferred to Stage 2
+D-columns are "days since X" timedeltas; public solutions often use
+`D - day` to make them cohort-stable. Baseline A keeps them raw (modest
+baseline, standard practice). If Stage 2's entity features underperform,
+this is the first cheap variant to test — est. 1h. **Status: logged.**
+
 ## P-003 — Integer-day convention for split membership
 `day = TransactionDT/86400` is float (1.000–182.999). Slice membership uses
 `day_idx = floor(day)`, inclusive bounds, so every row belongs to exactly
