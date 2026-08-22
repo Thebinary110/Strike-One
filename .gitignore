@@ -1,0 +1,10 @@
+# data is fetched by scripts/download_data.sh and verified by checksum;
+# never committed
+data/raw/
+data/processed/
+
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
