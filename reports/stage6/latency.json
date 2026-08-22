@@ -1,0 +1,13 @@
+{
+  "n_single": 2000,
+  "feature_p50_ms": 2.899,
+  "feature_p99_ms": 3.01,
+  "inference_p50_ms": 4.647,
+  "inference_p99_ms": 4.844,
+  "decision_p50_ms": 0.019,
+  "decision_p99_ms": 0.026,
+  "total_p99_ms": 7.843,
+  "batch_throughput_rows_per_s": 577565.0,
+  "cpu": "commodity CPU, single-threaded inference for the single-row path",
+  "note": "feature path is small because the shipped scorer uses no entity aggregates; the only online state is a blocklist KV set \u2014 nothing was precomputed away"
+}

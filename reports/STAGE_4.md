@@ -35,7 +35,13 @@
    The loss-weighted-recall skew exists at the ranking level, but with
    all three cost branches scaling with A (only c_h is fixed), the
    argmin's decisions are nearly amount-invariant. Negative finding,
-   reported as such.
+   reported as such. **Addendum (gate follow-up, one plot):** the argmin
+   *is* amount-dependent exactly where c_h is non-negligible relative to
+   A — at amt=5 the step-up→block boundary sits at p=0.077 vs p=0.347 at
+   amt=300, with the curves flattening above the median amount (≈68). The
+   effect is real, lives in the low-amount tail, and carries little
+   volume — which is why it nets out to ≈0 in aggregate cost
+   (`fig_action_regions.png`).
 4. **The lane-2 retrain is a real, CI-backed modelling win** (the gate's
    "experiment I most want run"): see B below.
 5. **Zero first strikes land in lane 1** — the routing rule loses nothing
@@ -45,6 +51,33 @@
    first-strike recall at budget 500 is 0.079 single-lane but 0.246 when
    restricted to lane-2 rows — the routing inoculates *any* scorer
    against the redundancy trap.
+
+## Corrections to gate guidance (recorded at the reviewer's request)
+
+Two calls in the Stage 4 gate guidance were wrong, and the measurements
+that corrected them are findings in their own right:
+
+1. **"The amount-dependent argmin has real headroom over any fixed
+   threshold" — refuted.** All three cost branches scale with the
+   transaction amount; only c_h is fixed, so the argmin sees amount only
+   through c_h and its decisions are nearly amount-invariant
+   (beats amount-blind 3-action in 55/81 corners, central gap 0.04%).
+2. **"Price the metric choice" as a headline delta — refuted in its naive
+   form.** Realized cost computed on propagated labels *is* amount-weighted
+   AP: it credits re-catching blocklist-covered fraud exactly as AP does.
+   **Anyone who tries to escape the AP distortion by "just measuring
+   money" gets the same distortion back.** This is elevated to a named
+   finding (it appears in the README claim), and the episode-aware
+   accounting above is the corrected instrument.
+
+## Named result: routing inoculation
+
+**Two-lane routing lifts the headline model B's tight-budget first-strike
+recall from 0.079 to 0.246 — 3.1× — for free.** The architecture
+inoculates *any* scorer against the redundancy trap, because the lane-1
+rule removes the propagated bait from the ranking population. For a risk
+team, this is actionable without changing the model they already run, and
+it is a stronger offer than "our model wins."
 
 ## Verifications from the Stage 3 gate
 

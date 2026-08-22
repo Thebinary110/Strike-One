@@ -17,6 +17,17 @@ while *reducing* first-strike recall with a confidence interval that
 excludes zero. Every piece is measured under a chronological protocol,
 paired-tested, and key-sensitivity-checked.
 
+Two further named results. **Money is not an escape hatch:** realized
+cost computed on propagated labels *is* amount-weighted AP — a team that
+tries to dodge the metric distortion by "just measuring money" inherits
+it intact; priced with episode-aware accounting, the +0.17 AP gap is
+worth ±0.03–0.14% of processed volume with a sign that flips across a
+reasonable cost grid — economically negligible at the unconstrained cost
+optimum, decisive under the capacity constraints every real risk team
+operates under. **Routing inoculation:** an explicit blocklist lane lifts
+the headline model's own tight-budget first-strike recall 0.079 → 0.246
+(3.1×) without touching the model — the architecture protects any scorer.
+
 **Generalisation bridge — hypothesis, not measurement:** label
 propagation is not a quirk of this dataset's annotation; it is what any
 chargeback-derived label set looks like, because real blocklists work the
@@ -71,12 +82,24 @@ before any result:
 ```bash
 uv sync                          # pinned environment (uv.lock)
 bash scripts/download_data.sh    # fetch + checksum-verify the public dataset
-uv run pytest                    # metric unit tests
-uv run python scripts/stage0_build.py   # ingest, split, seal holdout
+uv run pytest                    # unit tests (metrics, episodes, seal, console)
+uv run python scripts/stage0_build.py        # ingest, split, seal holdout
+uv run python scripts/stage1_baseline_a.py   # Baseline A (frozen)
+uv run python scripts/stage1_leak_table.py   # the 2x2 leakage table
+uv run python scripts/stage2_baseline_b.py   # entity features + ablations
+uv run python scripts/stage2_uid_family.py   # UID-family experiment
+uv run python scripts/stage3_episode_analysis.py  # episode/friction tables
+uv run python scripts/stage4_lane2.py        # lane-2 retrain (A2)
+uv run python scripts/stage4_policy.py       # decision engine + freeze
+uv run python scripts/stage4_episode_cost.py # episode-aware pricing
+uv run python scripts/stage6_prepare_replay.py    # console replay file
+uv run python -m strikeone.console           # -> http://127.0.0.1:8777
 ```
 
 All randomness is seeded (`strikeone.config.SEED`). Runs on a laptop CPU; no
-cloud, no GPU.
+cloud, no GPU. The console is self-contained (stdlib server, no auth, no
+database); its every number is computed from the replay file and the frozen
+Stage 4 config — swap `--data` to re-point it (Stage 7 does exactly that).
 
 ## Data: source, faithfulness, licensing
 

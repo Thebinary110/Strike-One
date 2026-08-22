@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Strike One — episode-aware risk console</title>
+<style>
+  :root {
+    --bg:#0f1419; --panel:#171e26; --line:#232d38; --txt:#dbe4ec;
+    --dim:#8296a8; --good:#3ecf8e; --warn:#f0a840; --bad:#ef5b5b;
+    --accent:#5aa9f0;
+  }
+  * { box-sizing:border-box; margin:0; }
+  body { background:var(--bg); color:var(--txt);
+         font:14px/1.45 "Segoe UI", system-ui, sans-serif; padding:18px 26px; }
+  h1 { font-size:19px; letter-spacing:.4px; }
+  h1 small { color:var(--dim); font-weight:400; font-size:12px; margin-left:10px;}
+  .row { display:flex; gap:16px; margin-top:14px; flex-wrap:wrap; }
+  .panel { background:var(--panel); border:1px solid var(--line);
+           border-radius:10px; padding:14px 18px; }
+  /* controls */
+  #controls { display:flex; gap:28px; align-items:center; flex-wrap:wrap; }
+  #controls label { color:var(--dim); font-size:11px; text-transform:uppercase;
+                    letter-spacing:.8px; display:block; margin-bottom:5px;}
+  input[type=range] { width:260px; accent-color:var(--accent); }
+  select, button { background:#101820; color:var(--txt); border:1px solid var(--line);
+           border-radius:6px; padding:5px 10px; font-size:13px; }
+  .toggle { cursor:pointer; }
+  .toggle.on { border-color:var(--good); color:var(--good); }
+  .cap-note { color:var(--dim); font-size:11px; margin-top:4px; }
+  #spark { margin-top:6px; }
+  /* counters */
+  .counter { flex:1; min-width:330px; text-align:center; padding:22px 18px; }
+  .counter .big { font-size:52px; font-weight:700; letter-spacing:-1px; }
+  .counter .of { font-size:20px; color:var(--dim); font-weight:400;}
+  .counter .name { color:var(--dim); font-size:12px; text-transform:uppercase;
+                   letter-spacing:1.1px; margin-top:6px;}
+  #c1 .big { color:var(--good); } #c2 .big { color:var(--warn); }
+  .subline { color:var(--dim); font-size:12.5px; margin-top:10px; }
+  .honest { border-left:3px solid var(--bad); padding:8px 14px; font-size:12.5px;
+            color:var(--txt); background:#1b141a; border-radius:0 8px 8px 0;
+            margin-top:12px; }
+  .honest b { color:var(--bad); }
+  /* stream + timeline */
+  #stream { flex:1.1; min-width:420px; max-height:380px; overflow:hidden; }
+  #stream table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  #stream td, #stream th { padding:3px 8px; text-align:left; white-space:nowrap; }
+  #stream th { color:var(--dim); font-size:10.5px; text-transform:uppercase; }
+  #stream tr.tx { border-top:1px solid var(--line); cursor:pointer; }
+  #stream tr.tx:hover { background:#1c2733; }
+  .pill { border-radius:9px; padding:1px 8px; font-size:11px; }
+  .act-approve { background:#12351f; color:var(--good); }
+  .act-step-up { background:#3a2c10; color:var(--warn); }
+  .act-block   { background:#3a1616; color:var(--bad); }
+  .lane1 { color:var(--bad); } .lane2 { color:var(--accent); }
+  #timeline { flex:1; min-width:460px; }
+  #timeline h3, #stream h3 { font-size:12px; color:var(--dim);
+     text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;}
+  .legend { font-size:11.5px; color:var(--dim); margin-top:6px; }
+  .legend span { margin-right:14px; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%;
+         margin-right:4px; vertical-align:middle;}
+  footer { color:var(--dim); font-size:11.5px; margin-top:16px; }
+</style>
+</head>
+<body>
+<h1>STRIKE ONE <small id="meta-line">loading…</small></h1>
+
+<div class="panel" id="controls">
+  <div>
+    <label>Review capacity — alerts/day <span style="text-transform:none">(stated review-capacity assumption)</span></label>
+    <input type="range" id="cap" min="0" max="12" step="1" value="7">
+    <div class="cap-note"><b id="cap-val">100</b> alerts/day · budget <b id="budget">–</b> over <span id="ndays">–</span> days</div>
+    <svg id="spark" width="270" height="46"></svg>
+  </div>
+  <div>
+    <label>Scorer</label>
+    <select id="scorer">
+      <option value="shipped">shipped — two-lane + A2</option>
+      <option value="headline">headline pick — B (AP 0.748)</option>
+      <option value="blocklist">blocklist only (no model)</option>
+    </select>
+  </div>
+  <div>
+    <label>Routing</label>
+    <button id="routing" class="toggle on">two-lane: ON</button>
+    <div class="cap-note" id="routing-note">lane-1 blocks known-bad entities, consuming no alerts</div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="panel counter" id="c1">
+    <div class="big"><span id="fs">–</span><span class="of"> / <span id="neps">–</span></span></div>
+    <div class="name">Episodes stopped at strike one</div>
+    <div class="subline" id="fsr">first-strike recall –</div>
+  </div>
+  <div class="panel counter" id="c2">
+    <div class="big" id="red">–</div>
+    <div class="name">Alerts spent re-flagging entities already known bad</div>
+    <div class="subline" id="lane1-line">–</div>
+  </div>
+</div>
+<div class="honest" id="honest">–</div>
+
+<div class="row">
+  <div class="panel" id="stream">
+    <h3>Decision stream (shipped system, frozen central params) — click a row for its entity <button id="pause" style="float:right">⏸</button></h3>
+    <table><thead><tr><th>day</th><th>amount</th><th>lane</th><th>p(fraud)</th><th>action</th><th>truth*</th></tr></thead>
+    <tbody id="rows"></tbody></table>
+  </div>
+  <div class="panel" id="timeline">
+    <h3>Entity timeline <button id="featured" style="float:right">show a real episode</button></h3>
+    <svg id="tl" width="100%" height="240"></svg>
+    <div class="legend">
+      <span><span class="dot" style="background:#5c6b7a"></span>legitimate</span>
+      <span><span class="dot" style="background:#ef5b5b"></span><b style="color:#ef5b5b">STRIKE ONE</b></span>
+      <span><span class="dot" style="background:#f0a840"></span>propagated (blocklist-coverable)</span>
+      <span>◻ ring = intervention</span>
+    </div>
+    <div class="legend" id="tl-info"></div>
+  </div>
+</div>
+
+<footer id="foot">* ground-truth episode roles are an evaluation overlay, unavailable at decision time.
+Every number on this page is computed live from the loaded replay slice and the frozen Stage 4 config — nothing is hardcoded.</footer>
+
+<script>
+const CAPS = [5,10,18,25,36,50,71,100,140,200,280,400,500];
+const $ = id => document.getElementById(id);
+let meta = null, curve = null, streamRows = [], cursor = 0, paused = false;
+
+const fmt = n => n.toLocaleString('en-IN');
+
+async function j(url) { const r = await fetch(url); return r.json(); }
+
+function controls() {
+  return {
+    per_day: CAPS[+$('cap').value],
+    scorer: $('scorer').value,
+    routing: $('routing').classList.contains('on') ? 'on' : 'off',
+  };
+}
+
+async function refresh() {
+  const c = controls();
+  $('cap-val').textContent = c.per_day;
+  const d = await j(`/api/counters?scorer=${c.scorer}&routing=${c.routing}&per_day=${c.per_day}`);
+  $('budget').textContent = fmt(d.budget);
+  $('ndays').textContent = d.n_days;
+  $('fs').textContent = fmt(d.fs_catches);
+  $('neps').textContent = fmt(d.n_episodes);
+  $('fsr').textContent = `first-strike recall ${(d.fs_recall*100).toFixed(1)}%`;
+  $('red').textContent = fmt(d.redundant_alerts);
+  $('lane1-line').textContent = d.lane1
+    ? `${fmt(d.lane1.n)} known-bad entities handled by the blocklist lane — zero alerts consumed`
+    : (c.scorer === 'blocklist' ? 'the blocklist IS the alert set (natural operating point)' :
+       'routing OFF — known-bad entities compete for the same alerts');
+  const fpTxt = `False positives at this budget: <b>${fmt(d.false_positives)}</b> — each one frictions a good customer as well as costing analyst time (strictly worse per unit than a redundant alert).`;
+  const l1Txt = d.lane1
+    ? ` The standing lane-1 policy also blocks <b>${fmt(d.lane1.legit_blocked)}</b> legitimate transactions of flagged entities — counted, shown, and logged as future work (step-up instead of hard block).`
+    : '';
+  $('honest').innerHTML = fpTxt + l1Txt;
+  drawSpark(c);
+}
+
+function drawSpark(c) {
+  if (!curve) return;
+  const svg = $('spark'); svg.innerHTML = '';
+  const W = 270, H = 46, P = 3;
+  const series = [
+    { k: `${c.scorer==='blocklist'?'shipped':c.scorer}/${c.routing}`, col: '#5aa9f0' },
+    { k: c.scorer === 'headline' ? 'shipped/on' : 'headline/off', col: '#666f78' },
+  ];
+  const xs = i => P + i * (W - 2*P) / (CAPS.length - 1);
+  const ys = v => H - P - v * (H - 2*P);
+  for (const s of series) {
+    const vals = curve.series[s.k]; if (!vals) continue;
+    const pts = vals.map((v, i) => `${xs(i)},${ys(v)}`).join(' ');
+    svg.innerHTML += `<polyline points="${pts}" fill="none" stroke="${s.col}" stroke-width="1.6"/>`;
+  }
+  const i = +$('cap').value;
+  svg.innerHTML += `<line x1="${xs(i)}" y1="0" x2="${xs(i)}" y2="${H}" stroke="#3a4652" stroke-dasharray="2,2"/>`
+    + `<text x="2" y="9" fill="#8296a8" font-size="8">first-strike recall vs capacity — blue: current, grey: comparison</text>`;
+}
+
+// ---------------- decision stream ----------------
+async function pump() {
+  if (paused || !streamRows.length) return;
+  const r = streamRows[cursor % streamRows.length]; cursor++;
+  const tb = $('rows');
+  const tr = document.createElement('tr');
+  tr.className = 'tx';
+  const roleTxt = ['·','STRIKE 1','prop'][r.role];
+  tr.innerHTML = `<td>${r.day.toFixed(2)}</td><td>${r.amount.toFixed(2)}</td>` +
+    `<td class="${r.lane==='lane-1'?'lane1':'lane2'}">${r.lane}</td>` +
+    `<td>${r.p===null?'— rule —':r.p.toFixed(4)}</td>` +
+    `<td><span class="pill act-${r.action}">${r.action}</span></td>` +
+    `<td style="color:${r.role===1?'#ef5b5b':r.role===2?'#f0a840':'#5c6b7a'}">${roleTxt}</td>`;
+  tr.onclick = () => showEntity(r.uid);
+  tb.prepend(tr);
+  while (tb.children.length > 14) tb.removeChild(tb.lastChild);
+}
+
+// ---------------- entity timeline ----------------
+async function showEntity(uid) {
+  const d = await j(`/api/entity?uid=${encodeURIComponent(uid)}`);
+  const svg = $('tl'); svg.innerHTML = '';
+  const W = svg.clientWidth || 520, H = 240, L = 40, R = 15, T = 24, B = 34;
+  const days = d.rows.map(r => r.day);
+  const lo = Math.min(...days), hi = Math.max(...days) + 1e-6;
+  const amts = d.rows.map(r => r.amount);
+  const amax = Math.max(...amts);
+  const x = v => L + (v - lo) / (hi - lo) * (W - L - R);
+  const y = v => H - B - Math.sqrt(v / amax) * (H - T - B);
+  svg.innerHTML += `<line x1="${L}" y1="${H-B}" x2="${W-R}" y2="${H-B}" stroke="#3a4652"/>`;
+  for (const r of d.rows) {
+    const cx = x(r.day), cy = y(r.amount);
+    const col = r.role === 1 ? '#ef5b5b' : r.role === 2 ? '#f0a840' : '#5c6b7a';
+    const rad = r.role === 1 ? 8 : 5.5;
+    if (r.action !== 'approve')
+      svg.innerHTML += `<circle cx="${cx}" cy="${cy}" r="${rad+3.5}" fill="none" stroke="${col}" stroke-width="1.1" opacity=".8"/>`;
+    svg.innerHTML += `<circle cx="${cx}" cy="${cy}" r="${rad}" fill="${col}"/>`;
+    if (r.role === 1)
+      svg.innerHTML += `<text x="${cx}" y="${cy-14}" fill="#ef5b5b" font-size="10" font-weight="700" text-anchor="middle">STRIKE ONE</text>`;
+    svg.innerHTML += `<text x="${cx}" y="${H-B+12}" fill="#8296a8" font-size="8" text-anchor="middle">d${r.day.toFixed(1)}</text>`;
+  }
+  const nf = d.rows.filter(r => r.y === 1).length;
+  $('tl-info').textContent =
+    `entity ${d.uid} — ${d.n} transactions in slice, ${nf} labelled fraud; ` +
+    `y-axis: amount (sqrt scale)`;
+}
+
+async function featured() {
+  const f = await j('/api/featured');
+  if (f.length) showEntity(f[Math.floor(Math.random() * Math.min(4, f.length))].uid);
+}
+
+// ---------------- boot ----------------
+(async () => {
+  meta = await j('/api/meta');
+  $('meta-line').textContent =
+    `episode-aware risk console · replay: days ${meta.day_range[0]}–${meta.day_range[1]} · ` +
+    `${fmt(meta.rows)} transactions · ${fmt(meta.n_episodes)} fraud episodes · holdout sealed`;
+  if (meta.latency) $('foot').textContent +=
+    ` · p99 per-transaction: model inference ${meta.latency.inference_p99_ms} ms, ` +
+    `feature path ${meta.latency.feature_p99_ms} ms (${meta.latency.note})`;
+  curve = await j('/api/curve');
+  streamRows = await j('/api/stream?start=0&limit=2000');
+  await refresh(); featured();
+  setInterval(pump, 450);
+  $('cap').oninput = refresh;
+  $('scorer').onchange = () => {
+    const bl = $('scorer').value === 'blocklist';
+    $('cap').disabled = bl; $('routing').disabled = bl;
+    refresh();
+  };
+  $('routing').onclick = () => {
+    const b = $('routing');
+    b.classList.toggle('on');
+    b.textContent = `two-lane: ${b.classList.contains('on') ? 'ON' : 'OFF'}`;
+    refresh();
+  };
+  $('pause').onclick = () => { paused = !paused; $('pause').textContent = paused ? '▶' : '⏸'; };
+  $('featured').onclick = featured;
+})();
+</script>
+</body>
+</html>
