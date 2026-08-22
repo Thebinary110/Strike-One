@@ -18,13 +18,28 @@
 3. **Chronological split** built as proposed in the brief, after checking
    the data for better cut points (it didn't suggest any — see below):
 
-   | Slice | Days | Rows | Positives | Fraud rate | Amount sum |
-   |---|---|---:|---:|---:|---:|
-   | Train | 1–112 | 389,523 | 13,350 | 3.43% | 52,432,828 |
-   | Delay gap | 113–119 | 21,078 | 1,069 | 5.07% | 2,807,307 |
-   | Validation | 120–147 | 79,954 | 2,810 | 3.51% | 10,788,560 |
-   | Blind gap | 148–150 | 7,558 | 221 | 2.92% | 983,656 |
-   | **Holdout** | **151–182** | **92,427** | **3,213** | **3.48%** | 12,726,594 |
+   | Slice | Days | Rows | Positives | Fraud rate | Amount sum | ID coverage | Amt median | Amt mean | Amt p95 |
+   |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+   | Train | 1–112 | 389,523 | 13,350 | 3.43% | 52,432,828 | 26.7% | 69.00 | 134.61 | 445.00 |
+   | Delay gap | 113–119 | 21,078 | 1,069 | 5.07% | 2,807,307 | 24.8% | 65.98 | 133.19 | 425.08 |
+   | Validation | 120–147 | 79,954 | 2,810 | 3.51% | 10,788,560 | 17.7% | 67.95 | 134.93 | 441.00 |
+   | Blind gap | 148–150 | 7,558 | 221 | 2.92% | 983,656 | 17.6% | 67.95 | 130.15 | 404.96 |
+   | **Holdout** | **151–182** | **92,427** | **3,213** | **3.48%** | 12,726,594 | 21.0% | 68.50 | 137.69 | 445.00 |
+
+   Descriptive columns (identity coverage, amount quantiles) are computed at
+   build time from the raw stream, label-free; the sealed parquet content is
+   untouched (hash unchanged after this addition).
+
+   - **Identity-join coverage drifts materially: 26.7% (train) → 17.7%
+     (val) → 21.0% (holdout).** Every device-keyed feature therefore
+     carries a built-in covariate shift between train and evaluation
+     periods — and a *different* shift for val than for holdout. Recorded
+     here so later stages read device-feature effects with that lens.
+   - **TransactionAmt is stable across slices** (median 65.98–69.00, mean
+     130–138, p95 405–445), so the Stage 4 savings figure is not silently
+     moved by an amount shift between fitting and evaluation periods.
+   - **TransactionID is monotonic in TransactionDT** — it is a pure time
+     proxy and goes on the permanent feature-exclusion list.
 
 4. **Holdout sealed in code.** Days 151–182 written to their own parquet;
    SHA-256 committed:
@@ -70,12 +85,40 @@
 - **The delay gap (days 113–119) is the highest-fraud-rate week in the
   modeling range: 5.07%** vs 3.4–3.5% for its neighbours (driven by days
   114–117, peaking at 6.4% on day 117). It is discarded — never fitted or
-  evaluated on — so it biases nothing, but it means the 7 days we throw
-  away are unusually fraud-dense. Noted for honesty, not action.
-- The blind gap (2.92%) and week 21 generally sit slightly below average
-  fraud rate; with only 7,558 rows this is within normal daily fluctuation.
+  evaluated on — so the *evaluation* is unbiased. But it is not inert for
+  features: under the 7-day label-availability rule, a validation
+  transaction on day 120 computes label-derived entity risk features from a
+  lookback ending on day 113 — squarely inside the 5.07% week, centred on
+  the 6.4% peak — while training rows never see a lookback that dense.
+  Early-validation risk features may therefore be displaced upward, and
+  Stage 4's cost argument rests on probabilities *calibrated on
+  validation*. **Flagged as a Stage 2 check:** once the label-derived risk
+  features exist, plot their distribution by day across validation; if days
+  120–127 are displaced, either drop that week from the calibration fit or
+  move the gap — and say which was done.
+- **The blind gap is belt-and-braces, not a guarantee.** Its 3 days are
+  thinner than the official competition's ~30-day train/test separation,
+  and D-column timedeltas reach back much further than 3 days, so the gap
+  alone does not prevent features from bridging the holdout boundary. The
+  real defence is point-in-time feature construction; the gap only blunts
+  the sharpest short-range bridges.
+- The blind gap (2.92% fraud) sits slightly below average; with only 7,558
+  rows this is within normal daily fluctuation.
+- **Identity coverage drift** (26.7% → 17.7% → 21.0%, table above) is the
+  one distribution shift found at this stage worth carrying forward.
 - Nothing else deviated from expectations: shapes, uniqueness, day range,
   and base rate all matched the brief's stated values exactly.
+
+## Episode-role convention (answering the gate question)
+
+Episode roles are assigned on the **global chronological stream**, never
+within a slice. An entity whose first strike lands on day 108 and which
+reappears flagged on day 125 is **propagated** in validation, not a first
+strike. This is now normative in `strikeone/episodes.py` and enforced by
+`test_roles_are_global_across_slices`, whose fixture has exactly that
+shape — first strike in train, later flagged transaction in validation —
+and which also demonstrates that a per-slice computation would misclassify
+it.
 
 ## Gate checklist
 

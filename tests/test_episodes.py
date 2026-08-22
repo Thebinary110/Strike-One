@@ -73,6 +73,29 @@ def test_loss_weighted_partial():
     assert r.loss_weighted_fs_recall == pytest.approx(100 / 400)
 
 
+def test_roles_are_global_across_slices():
+    # Entity u1: first strike on day 108 (train), flagged again on day 125
+    # (validation). Computed on the global stream and then sliced, the day-125
+    # row must be PROPAGATED. A per-slice computation would call it a first
+    # strike — the exact misclassification this test exists to prevent.
+    uid = ["u1", "u1", "u1", "u2"]
+    day = [100, 108, 125, 125]
+    y = [0, 1, 1, 1]
+    roles_global = E.episode_roles(uid, day, y)
+    val_mask = np.array(day) >= 120
+    assert roles_global[val_mask].tolist() == [
+        E.ROLE_PROPAGATED,     # u1's day-125 fraud: episode began day 108
+        E.ROLE_FIRST_STRIKE,   # u2 genuinely starts in validation
+    ]
+    # demonstrate the trap: per-slice roles would misclassify u1's day-125 row
+    roles_sliced = E.episode_roles(
+        [u for u, d in zip(uid, day) if d >= 120],
+        [d for d in day if d >= 120],
+        [l for l, d in zip(y, day) if d >= 120],
+    )
+    assert roles_sliced.tolist()[0] == E.ROLE_FIRST_STRIKE  # wrong on purpose
+
+
 def test_fp_on_flagged_entities():
     uid = ["u1", "u1", "u1"]
     t = [1, 2, 3]

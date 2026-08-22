@@ -43,6 +43,38 @@ uv run python scripts/stage0_build.py   # ingest, split, seal holdout
 All randomness is seeded (`strikeone.config.SEED`). Runs on a laptop CPU; no
 cloud, no GPU.
 
+## Data: source, faithfulness, licensing
+
+**Dataset.** IEEE-CIS Fraud Detection — real-world e-commerce transactions
+provided by Vesta Corporation for the 2019 Kaggle competition run with the
+IEEE Computational Intelligence Society
+(https://www.kaggle.com/c/ieee-fraud-detection). The dataset is also
+archived on IEEE DataPort. Only the two *training* files are used; the
+official test set's labels were never released and this project never
+touches it.
+
+**Two ways to fetch it.**
+1. `scripts/download_data.sh` (default) — pulls the two files from an
+   ungated public mirror, so a clean clone reproduces with one command and
+   no Kaggle account.
+2. Canonical, attributed source — `kaggle competitions download -c
+   ieee-fraud-detection` (requires a Kaggle account that has joined the
+   competition), then place `train_transaction.csv` and
+   `train_identity.csv` in `data/raw/`.
+
+**Faithfulness.** Whichever path you use, ingestion verifies three
+independent fingerprints of the official data, and the download script
+additionally checks pinned SHA-256s: exact shapes (590,540×394 and
+144,233×41), exact positive count (20,663), and exact max `TransactionDT`
+(15,811,131 s = day 182.999). A subtly different mirror would need to match
+all three simultaneously to slip through.
+
+**Licensing.** The data was released publicly by Vesta for the competition
+and its use here is non-commercial research/education under the
+competition's data-use terms. The data is **not vendored** in this
+repository — no row of it is committed; scripts fetch it from public
+hosting and verify integrity.
+
 ## Layout
 
 - `src/strikeone/` — library (data, splits, seal, metrics, episodes)

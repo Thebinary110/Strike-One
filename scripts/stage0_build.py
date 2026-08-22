@@ -25,10 +25,23 @@ def main() -> None:
     df = data.build_joined(tt, ti)
     print(f"joined: {df.shape}, day_idx {df['day_idx'].min()}..{df['day_idx'].max()}")
 
+    # TransactionID monotonicity in time: if IDs sort by DT, the ID is a time
+    # proxy and belongs on the permanent feature-exclusion list.
+    id_sorted_dt = df.sort_values("TransactionID")["TransactionDT"]
+    print(
+        "TransactionID monotonic in TransactionDT:",
+        bool(id_sorted_dt.is_monotonic_increasing),
+    )
+
+    # Identity-join coverage is computed from raw identity membership, NOT
+    # persisted to the parquet files (the holdout is sealed byte-for-byte).
+    has_identity = df["TransactionID"].isin(ti["TransactionID"])
+
     # ---- slice table --------------------------------------------------
     rows = []
     for name, (lo, hi) in config.SPLIT_DAYS.items():
         s = data.slice_days(df, name)
+        amt = s["TransactionAmt"]
         rows.append(
             {
                 "slice": name,
@@ -37,7 +50,11 @@ def main() -> None:
                 "rows": len(s),
                 "positives": int(s["isFraud"].sum()),
                 "fraud_rate": round(float(s["isFraud"].mean()), 5),
-                "amount_sum": round(float(s["TransactionAmt"].sum()), 0),
+                "amount_sum": round(float(amt.sum()), 0),
+                "id_coverage": round(float(has_identity[s.index].mean()), 4),
+                "amt_median": round(float(amt.median()), 2),
+                "amt_mean": round(float(amt.mean()), 2),
+                "amt_p95": round(float(amt.quantile(0.95)), 2),
             }
         )
     table = pd.DataFrame(rows)

@@ -5,6 +5,14 @@ earliest fraud transaction (by time, TransactionID tiebreak) is the *first
 strike*; every later fraud transaction on the same entity is *propagated* —
 in a real system the entity is already blocklisted by then.
 
+NORMATIVE: roles are defined on the entity's GLOBAL chronological stream,
+never within an evaluation slice. An entity whose first strike lands in the
+training period and which reappears flagged in validation/holdout is
+PROPAGATED there — a per-slice "first fraud per UID" would misclassify it as
+a fresh first strike and inflate first-strike metrics. Callers must compute
+roles on the full history and then slice the result; see
+tests/test_episodes.py::test_roles_are_global_across_slices.
+
 Every intervention (alert) is classified:
   first-strike catch  alert on the entity's first fraud transaction
   redundant           alert on a later fraud transaction of the same entity

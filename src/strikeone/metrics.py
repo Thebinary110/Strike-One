@@ -89,6 +89,21 @@ def card_precision_at_k(day_idx, card_id, y_true, y_score, k: int) -> float:
     return float(np.mean(precisions))
 
 
+DEFAULT_CPK_GRID = (10, 25, 50, 100)
+
+
+def card_precision_curve(day_idx, card_id, y_true, y_score, ks=DEFAULT_CPK_GRID):
+    """Card Precision@k over a grid of k, as {k: precision}.
+
+    Reported as a curve because at ~100 positives/day a large single k makes
+    precision@k and recall@k nearly the same number — a degenerate point.
+    """
+    return {
+        int(k): card_precision_at_k(day_idx, card_id, y_true, y_score, k)
+        for k in ks
+    }
+
+
 # ------------------------------------------------------------------ cost
 
 @dataclass(frozen=True)

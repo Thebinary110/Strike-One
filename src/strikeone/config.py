@@ -21,9 +21,13 @@ HOLDOUT_PARQUET = DATA_PROCESSED / "holdout.parquet"     # days 151-182, sealed
 HOLDOUT_SHA_FILE = REPO_ROOT / "data" / "holdout.sha256"  # committed
 HOLDOUT_ACCESS_LOG = REPORTS / "holdout_access.log"       # committed
 
-# Expected raw shapes; a mismatch means the download is wrong.
+# Expected raw fingerprints; a mismatch means the download is wrong.
+# Shapes alone would pass a subtly different mirror; the exact positive
+# count and max TransactionDT would not.
 EXPECTED_TRANSACTION_SHAPE = (590_540, 394)
 EXPECTED_IDENTITY_SHAPE = (144_233, 41)
+EXPECTED_POSITIVES = 20_663
+EXPECTED_MAX_TRANSACTION_DT = 15_811_131
 
 SECONDS_PER_DAY = 86_400
 

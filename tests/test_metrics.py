@@ -45,6 +45,15 @@ def test_card_precision_at_k_hand():
     assert M.card_precision_at_k(day, card, y, s, k=1) == pytest.approx(1.0)
 
 
+def test_card_precision_curve_hand():
+    day = [1, 1, 1, 1, 2, 2]
+    card = ["A", "A", "B", "C", "D", "E"]
+    y = [0, 1, 0, 0, 1, 0]
+    s = [0.9, 0.2, 0.8, 0.1, 0.7, 0.6]
+    curve = M.card_precision_curve(day, card, y, s, ks=[1, 2])
+    assert curve == {1: pytest.approx(1.0), 2: pytest.approx(0.5)}
+
+
 PARAMS = M.CostParams(m=0.1, a=0.2, e=0.8, c_h=15.0)
 
 

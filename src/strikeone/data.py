@@ -30,6 +30,16 @@ def load_raw(verify: bool = True) -> tuple[pd.DataFrame, pd.DataFrame]:
                 f"train_identity shape {ti.shape} != expected "
                 f"{config.EXPECTED_IDENTITY_SHAPE}; the download is wrong."
             )
+        if int(tt["isFraud"].sum()) != config.EXPECTED_POSITIVES:
+            raise DataVerificationError(
+                f"positive count {int(tt['isFraud'].sum())} != expected "
+                f"{config.EXPECTED_POSITIVES}; the download is wrong."
+            )
+        if int(tt["TransactionDT"].max()) != config.EXPECTED_MAX_TRANSACTION_DT:
+            raise DataVerificationError(
+                f"max TransactionDT {int(tt['TransactionDT'].max())} != expected "
+                f"{config.EXPECTED_MAX_TRANSACTION_DT}; the download is wrong."
+            )
         if not tt["TransactionID"].is_unique or not ti["TransactionID"].is_unique:
             raise DataVerificationError("TransactionID is not unique.")
         if not ti["TransactionID"].isin(tt["TransactionID"]).all():
