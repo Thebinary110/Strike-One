@@ -1,0 +1,7 @@
+segment,model,n,positives,alerts,fs_catch,redundant,false_pos,fs_precision(friction_eff),fs_recall,lw_fs_recall,prop_recall,redundancy_rate,txn_precision
+known_entity,Blocklist,37803,891,1533,0,815,718,0.0,0.0,0.0,0.9282,1.0,0.5316
+known_entity,A,37803,891,610,3,370,237,0.0049,0.2308,0.1321,0.4214,0.992,0.6115
+known_entity,B,37803,891,950,3,790,157,0.0032,0.2308,0.1321,0.8998,0.9962,0.8347
+novel_entity,Blocklist,42151,1919,178,0,113,65,0.0,0.0,0.0,0.1267,1.0,0.6348
+novel_entity,A,42151,1919,2200,588,569,1043,0.2673,0.5725,0.4172,0.6379,0.4918,0.5259
+novel_entity,B,42151,1919,1860,571,556,733,0.307,0.556,0.4066,0.6233,0.4933,0.6059

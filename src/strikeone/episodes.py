@@ -48,6 +48,13 @@ def episode_roles(
     decisions are made by the caller, see Stage 3).
     """
     df = pd.DataFrame({"uid": uid, "t": time, "y": np.asarray(is_fraud)})
+    if df["uid"].isna().any():
+        raise ValueError(
+            "episode_roles received null entity ids; a NaN uid would be "
+            "silently treated as its own singleton entity, manufacturing "
+            "spurious first strikes. Resolve or pool null keys explicitly "
+            "before computing roles."
+        )
     df["tb"] = tiebreak if tiebreak is not None else np.arange(len(df))
     order = df.sort_values(["uid", "t", "tb"]).index
     y_sorted = df.loc[order, "y"].to_numpy()

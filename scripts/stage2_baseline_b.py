@@ -212,10 +212,14 @@ def main():
     res["meta"] = meta
     (OUT / "baseline_b.json").write_text(json.dumps(res, indent=2, default=float))
 
-    # cache B scores for later stages
+    # cache all variant scores for later stages
     pd.DataFrame(
         {"TransactionID": val_df["TransactionID"].to_numpy(),
-         "score_b": sB, "score_a": s_a, "y": y_val}
+         "score_a": s_a,
+         "score_abeh": scores["A+beh"],
+         "score_alabel": scores["A+label"],
+         "score_b": sB,
+         "y": y_val}
     ).to_parquet(config.REPO_ROOT / "models" / "stage2_val_scores.parquet",
                  index=False)
 

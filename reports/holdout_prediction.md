@@ -57,7 +57,7 @@ should land near validation levels: AP **[0.50, 0.62]**, ROC-AUC
 **[0.90, 0.93]**. Implied retraining value: roughly +0.1 to +0.2 AP.
 
 These ranges are stated for the shipped model's headline scores. Stage 2
-measured B ≈ A + at most a small delta (UID family +0.007 AP), so the
+measured B ≈ A + at most a small delta (UID family +0.005 AP), so the
 ranges hold whichever of A/B ships; they are priors to be surprised by,
 not targets to hit. A result far outside them means first "look for a
 bug", and only then "update the theory".

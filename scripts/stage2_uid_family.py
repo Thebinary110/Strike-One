@@ -122,6 +122,12 @@ def main():
               f"A+fam={f[0]:.4f} [{f[1]:.4f},{f[2]:.4f}]  "
               f"delta={d[0]:+.4f} [{d[1]:+.4f},{d[2]:+.4f}] p(<=0)={d[3]:.3f}")
 
+    pd.DataFrame(
+        {"TransactionID": val_df["TransactionID"].to_numpy(),
+         "score_afam": s_f, "y": y_val}
+    ).to_parquet(config.REPO_ROOT / "models" / "stage2_afam_scores.parquet",
+                 index=False)
+
     res["family_n_features"] = int(fam.shape[1])
     res["family_gain_share"] = float(sum(fam_gain.values()) / total)
     res["family_top_gain"] = [(c, float(g)) for c, g in top_fam]

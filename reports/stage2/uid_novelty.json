@@ -6,13 +6,13 @@
       "resolved_lv3": 0.8881,
       "d1_null_lv2": 0.0006,
       "addr1_null_lv1": 0.1113,
-      "uid_cardinality": 144949,
-      "txns_per_uid_mean": 2.39,
+      "uid_cardinality": 157365,
+      "txns_per_uid_mean": 2.48,
       "txns_per_uid_p50": 1.0,
       "txns_per_uid_p90": 5.0,
-      "txns_per_uid_p99": 16.0,
+      "txns_per_uid_p99": 17.0,
       "txns_per_uid_max": 300,
-      "share_singleton_uids": 0.5913
+      "share_singleton_uids": 0.5865
     },
     {
       "slice": "val",
@@ -20,13 +20,13 @@
       "resolved_lv3": 0.8879,
       "d1_null_lv2": 0.0101,
       "addr1_null_lv1": 0.102,
-      "uid_cardinality": 39639,
-      "txns_per_uid_mean": 1.79,
+      "uid_cardinality": 43383,
+      "txns_per_uid_mean": 1.84,
       "txns_per_uid_p50": 1.0,
       "txns_per_uid_p90": 3.0,
-      "txns_per_uid_p99": 9.0,
-      "txns_per_uid_max": 58,
-      "share_singleton_uids": 0.6527
+      "txns_per_uid_p99": 10.0,
+      "txns_per_uid_max": 64,
+      "share_singleton_uids": 0.6489
     },
     {
       "slice": "holdout",
@@ -34,22 +34,22 @@
       "resolved_lv3": 0.8951,
       "d1_null_lv2": 0.0004,
       "addr1_null_lv1": 0.1044,
-      "uid_cardinality": 43469,
-      "txns_per_uid_mean": 1.9,
+      "uid_cardinality": 46896,
+      "txns_per_uid_mean": 1.97,
       "txns_per_uid_p50": 1.0,
       "txns_per_uid_p90": 4.0,
-      "txns_per_uid_p99": 10.0,
+      "txns_per_uid_p99": 11.0,
       "txns_per_uid_max": 1395,
-      "share_singleton_uids": 0.6384
+      "share_singleton_uids": 0.6326
     }
   ],
   "novelty": [
     {
       "slice": "val",
       "key": "uid",
-      "null_rate": 0.1121,
-      "novel_vs_train": 0.5236,
-      "novel_vs_all_prior": 0.4922
+      "null_rate": 0.0,
+      "novel_vs_train": 0.558,
+      "novel_vs_all_prior": 0.5272
     },
     {
       "slice": "val",
@@ -82,9 +82,9 @@
     {
       "slice": "holdout",
       "key": "uid",
-      "null_rate": 0.1049,
-      "novel_vs_train": 0.6482,
-      "novel_vs_all_prior": 0.5165
+      "null_rate": 0.0,
+      "novel_vs_train": 0.6737,
+      "novel_vs_all_prior": 0.5488
     },
     {
       "slice": "holdout",
@@ -115,7 +115,7 @@
       "novel_vs_all_prior": 0.0181
     }
   ],
-  "val_fraud_rate_novel_uid": 0.031204605369344166,
-  "val_fraud_rate_seen_uid": 0.038569424964936885,
-  "val_positive_share_on_novel_uid": 0.4128113879003559
+  "val_fraud_rate_novel_uid": 0.04765533937057294,
+  "val_fraud_rate_seen_uid": 0.019353743421424933,
+  "val_positive_share_on_novel_uid": 0.7565836298932385
 }

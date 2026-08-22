@@ -133,13 +133,21 @@ def build_uid(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
     Returns (uid, level): level 3 = all three components present,
     level 2 = D1 null (addr1 present), level 1 = addr1 null.
     """
+    def comp(x: pd.Series) -> np.ndarray:
+        # NaN -> literal "nan"; pandas 3's astype(str) would propagate NA
+        # instead, silently turning fallback rows into null UIDs (each then
+        # miscounted as its own entity). Regression-tested.
+        a = x.to_numpy(dtype="float64")
+        m = ~np.isnan(a)
+        assert (a[m] % 1 == 0).all(), "UID component not integral"
+        out = np.full(len(a), "nan", dtype=object)
+        out[m] = a[m].astype(np.int64).astype(str)
+        return out
+
     first_seen = np.floor(df["day"] - df["D1"])
-    uid = (
-        df["card1"].astype(str)
-        + "_"
-        + df["addr1"].astype(str)
-        + "_"
-        + first_seen.astype(str)
+    uid = pd.Series(
+        comp(df["card1"]) + "_" + comp(df["addr1"]) + "_" + comp(first_seen),
+        index=df.index,
     )
     level = np.where(
         df["addr1"].isna(), 1, np.where(df["D1"].isna(), 2, 3)

@@ -1,0 +1,47 @@
+{
+  "d1_integral": true,
+  "novelty_attribution": {
+    "changed_firstseen_given_pair": 0.918,
+    "novel_addr1_given_card1": 0.0602,
+    "novel_card1": 0.0217
+  },
+  "val_uid_novelty_rate": 0.558,
+  "firstseen_per_pair": {
+    "pairs_with_2plus_txns": 21000,
+    "share_1_value": 0.2412,
+    "share_2_values": 0.2514,
+    "share_3plus": 0.5073
+  },
+  "min_gap_eq_1_share": 0.2337,
+  "min_gap_distribution_p50_p90": [
+    9.0,
+    116.0
+  ],
+  "val_first_strikes": 1040,
+  "fs_with_pm1_sibling_earlier_fraud": 12,
+  "fs_suspect_share": 0.0115,
+  "uid_sizes_resolved_lv3": {
+    "n_uids": 174251,
+    "txns_mean": 2.53,
+    "txns_p50": 1.0,
+    "txns_p99": 18.0,
+    "txns_max": 381,
+    "fraud_txns_per_episode_mean": 2.63,
+    "fraud_txns_per_episode_max": 84
+  },
+  "uid_sizes_fallback_lv1_null_addr1": {
+    "n_uids": 15515,
+    "txns_mean": 3.61,
+    "txns_p50": 1.0,
+    "txns_p99": 34.0,
+    "txns_max": 211,
+    "fraud_txns_per_episode_mean": 2.36,
+    "fraud_txns_per_episode_max": 64
+  },
+  "partition_coverage": {
+    "all_rows_partitioned": true,
+    "share_client_resolution_lv3": 0.8854,
+    "share_card1_firstseen_pooled_lv1": 0.1125,
+    "share_d1_null_lv2": 0.0021
+  }
+}

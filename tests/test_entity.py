@@ -78,6 +78,30 @@ def test_delayed_label_excludes_recent():
     assert np.isnan(f["ent_fraud_rate"][1])
 
 
+def test_build_uid_nan_stringification():
+    # pandas 3 regression: astype(str) propagates NA; null components must
+    # become the literal "nan" so fallback rows pool into pseudo-entities
+    df = pd.DataFrame(
+        {
+            "card1": [100.0, 100.0, 200.0],
+            "addr1": [np.nan, np.nan, 300.0],
+            "day": [10.5, 11.5, 12.5],
+            "D1": [5.0, 6.0, np.nan],
+        }
+    )
+    uid, level = E.build_uid(df)
+    assert uid.notna().all()
+    assert uid.tolist() == ["100_nan_5", "100_nan_5", "200_300_nan"]
+    assert level.tolist() == [1, 1, 2]
+
+
+def test_episode_roles_reject_null_uid():
+    from strikeone import episodes as EP
+
+    with pytest.raises(ValueError, match="null entity ids"):
+        EP.episode_roles([None, "a"], [1, 2], [1, 0])
+
+
 def test_no_cross_entity_bleed():
     # entity b's rows must not see entity a's history
     key = ["a", "b"]
