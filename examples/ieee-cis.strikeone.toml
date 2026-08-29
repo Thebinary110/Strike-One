@@ -1,0 +1,12 @@
+# Mapping for the frozen IEEE-CIS worked example (built into the CLI as
+# --example ieee-cis; this file exists as a copyable reference).
+[strikeone]
+source = "data/processed/holdout_replay.parquet"
+label_delay_days = 7.0
+transaction_id = "TransactionID"
+timestamp = "t"
+amount = "amount"
+entity = ["uid"]
+label = "y"
+score = "s_shipped"
+p = "p_shipped"

@@ -1,8 +1,50 @@
 # Strike One
 
-An episode-aware card-not-present fraud risk engine, built on the IEEE-CIS
-Fraud Detection dataset for the Razorpay AI Buildathon (AI Risk Manager
-track). Strictly defense-only.
+Bring-your-own-scorer fraud routing and the corrected evaluation, as an
+installable package with a terminal UI. Built for the Razorpay AI
+Buildathon (AI Risk Manager track). Strictly defense-only.
+
+**We ship the method and the measurement. You bring the scorer. The
+included IEEE-CIS run is a worked example, not a deployable model** — a
+model trained on Vesta's anonymised US data does not transfer to your
+production traffic, and we will not pretend otherwise. What does
+transfer: the blocklist routing lane, and an audit nobody can get today
+without writing what we already wrote.
+
+**Your data never leaves the machine.** No telemetry, no network calls,
+anywhere in the package.
+
+## Quickstart
+
+```bash
+pip install -e .                      # or: uv sync
+strikeone check --example ieee-cis    # validate the worked example
+strikeone audit --example ieee-cis    # the corrected evaluation, live
+strikeone tui                         # the terminal UI (Node 18+)
+```
+
+No pipeline outputs built yet? `--example synthetic` runs instantly on
+generated data (clearly labelled as such; the repo never vendors dataset
+rows). Against your own data, no code required:
+
+```bash
+strikeone audit yourdata.parquet \
+  --map transaction_id=txn_id --map timestamp=created_at \
+  --map amount=amount_inr --map entity=card_hash+email_hash \
+  --map label=is_chargeback --delay 30 --save-config
+```
+
+`strikeone audit` answers, for YOUR labelled data: how many of your fraud
+cases are stopped at the first attempt (vs what your headline AP/recall
+says), what share of your correct alerts land on entities a blocklist
+already knows, and how much of your headline metric a blocklist alone
+recovers. `strikeone route` wraps whatever scorer you already run with
+the two-lane routing and measures the lift. `strikeone policy` turns
+declared-range economics into {approve, step-up, block} recommendations.
+Mapping examples, including a PSP-shaped disputes export: `examples/`.
+
+Library API mirrors the CLI: `from strikeone import audit, route, policy`
+(modules `strikeone.audit`, `strikeone.route`, `strikeone.policy_engine`).
 
 ## The claim
 
@@ -189,7 +231,7 @@ on a prediction, but on three measurements already in our reports:
 
 Showing this reasoning beats manufacturing a null we can already derive.
 
-## Reproduce
+## Reproduce the worked example
 
 ```bash
 uv sync                          # pinned environment (uv.lock)
@@ -213,10 +255,10 @@ uv run python -m strikeone.console           # -> http://127.0.0.1:8777
 
 All randomness is seeded (`strikeone.config.SEED`). Runs on a laptop CPU;
 no cloud, no GPU. Clean-clone reproduction is verified through
-`stage0_build` (byte-identical holdout hash) and the full test suite; the
-console is self-contained (stdlib server, no auth, no database) and every
-number it shows is computed from the replay file plus the frozen config —
-`--data data/processed/holdout_replay.parquet` shows the final numbers.
+`stage0_build` (byte-identical holdout hash) and the full test suite.
+The optional web console (`strikeone console`, a self-contained stdlib
+server) remains as an extra surface; the package and the TUI are the
+product.
 
 ## Data: source, faithfulness, licensing
 
@@ -252,9 +294,15 @@ hosting and verify integrity.
 
 ## Layout
 
-- `src/strikeone/` — library (data, seal, metrics, episodes, entity,
-  console); see `ARCHITECTURE.md` for the system and evaluation design
-- `scripts/` — one entry point per stage
+- `src/strikeone/` — the package: contract + mapping (`contract.py`),
+  `audit`, `route`, `policy_engine`, `cli`, `rpc` (the TUI's backend),
+  plus the evaluation core (metrics, episodes, entity, seal) and the
+  optional web console; see `ARCHITECTURE.md`
+- `tui/` — the Ink terminal UI (TypeScript; a surface, never a dependency
+  of the core)
+- `examples/` — mapping examples: IEEE-CIS and a PSP-shaped disputes
+  export
+- `scripts/` — one entry point per pipeline stage (the worked example)
 - `reports/STAGE_N.md` — per-stage findings, written for a skeptical
   reader; `reports/holdout_prediction.md` — the pre-registration;
   `reports/holdout_access.log` — the seal's one entry

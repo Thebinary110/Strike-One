@@ -1,0 +1,12 @@
+# PSP-shaped mapping: a transactions export joined with dispute outcomes
+# (reason codes + won/lost), the shape a payments team can pull from their
+# PSP's disputes API. See psp_disputes_sample.csv and examples/README.md.
+[strikeone]
+source = "examples/psp_disputes_sample.csv"
+label_delay_days = 30.0
+transaction_id = "payment_id"
+timestamp = "created_at"
+amount = "amount"
+entity = ["card_fingerprint", "email_hash"]
+label = "chargeback_fraud"
+score = "risk_score"
