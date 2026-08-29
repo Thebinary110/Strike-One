@@ -15,7 +15,8 @@ scoreless blocklist reaches 54% transaction precision while preventing
 nothing; adding the entity-history features everyone adds buys +0.17 AP
 while *reducing* first-strike recall with a confidence interval that
 excludes zero. Every piece is measured under a chronological protocol,
-paired-tested, and key-sensitivity-checked.
+paired-tested, key-sensitivity-checked — and re-confirmed on a sealed
+out-of-time holdout opened exactly once against a pre-registered plan.
 
 Two further named results. **Money is not an escape hatch:** realized
 cost computed on propagated labels *is* amount-weighted AP — a team that
@@ -26,7 +27,8 @@ reasonable cost grid — economically negligible at the unconstrained cost
 optimum, decisive under the capacity constraints every real risk team
 operates under. **Routing inoculation:** an explicit blocklist lane lifts
 the headline model's own tight-budget first-strike recall 0.079 → 0.246
-(3.1×) without touching the model — the architecture protects any scorer.
+(3.1× on validation; 2.32× on the holdout, as pre-registered) without
+touching the model — the architecture protects any scorer.
 
 And the yardstick chose the better *system*, not just the better score:
 because the corrected metric selected a scorer with **no entity
@@ -43,6 +45,30 @@ same way. Any team training on chargeback-derived labels against a
 transaction-level metric is exposed to the same distortion. We measured
 it on one public benchmark; we did not measure it on anyone's production
 data, and we say so.
+
+## The mechanism: how the labels were made
+
+The dataset's host labeled the reported chargeback *and every later
+transaction linked to the same user account, email address, or billing
+address* as fraud; anything unreported for 120 days is labeled
+legitimate. The positive class therefore mixes "the moment an episode
+started" (a **first strike** — catching it prevents loss) with
+"transactions a blocklist would have caught for free" (**propagated** —
+catching them prevents nothing). Transaction-level metrics credit both
+equally, so they reward remembering. Every operational magnitude we quote
+is dataset-specific; the *mechanism* is what we claim generalises (as a
+hypothesis, above).
+
+## The self-carved holdout, and why
+
+The official `test.csv` labels were never released, so we carve a
+chronological holdout (days 151–182) from the training file, seal it in
+code (SHA-256 pinned, loadable only through an access-logged unseal call),
+and open it **exactly once**, at the end, against a pre-registered
+analysis plan. `reports/holdout_access.log` contains **exactly one
+entry** — timestamped, hash-verified, with the pre-registration commit in
+its stated reason. A clean-clone rebuild reproduces the sealed file
+byte-identically.
 
 ## Bugs our own checks caught
 
@@ -69,6 +95,81 @@ A submission whose checks have never fired is a submission whose checks
 were never tested. Ours fired twice, on our own headline numbers, before
 any external reader saw them.
 
+## The pre-registration, and whether it held
+
+Predicted ranges, an eight-item analysis plan (exact figures, order, and
+operating points), and the two-number reporting policy were committed
+**before** the seal broke (`reports/holdout_prediction.md`). Scorecard:
+**6 hits, 3 misses — misses first**:
+
+- **Primary AP missed high** (0.532 vs predicted [0.32, 0.48]): the
+  frozen model aged far better than our decay extrapolation. Integrity
+  checks (hash, exact counts, feature-list asserts) preceded belief; no
+  unregistered diagnostics were run.
+- **The distortion did not weaken** (B−A = +0.177 vs predicted
+  +0.06…+0.14) — because its input variable didn't move: the propagated
+  share of positives stayed at 62.7% (predicted to fall), as propagation
+  regenerates *within* the window. The forecast of the input was wrong;
+  **the mechanism — distortion scales with propagated share — behaved
+  exactly as claimed** (share flat ⇒ distortion flat, +0.174 → +0.177).
+- Hits: primary AUC, secondary AP and AUC, routing ratio (2.32× in
+  [1.5, 2.8]), lane-1 row and positive shares.
+
+Full scorecard and discussion: `reports/STAGE_7.md`.
+
+## Assumption ranges, and the remaining caveats
+
+- **Every economic figure is an assumption range, not a fact.** We are
+  not Razorpay and do not know their economics. Cost parameters are
+  declared ranges (m ∈ [0.05, 0.25], a ∈ [0.05, 0.20], e ∈ [0.60, 0.95],
+  c_h ∈ [15, 60] amount-units) with a published 81-corner sensitivity
+  grid and its vanishing corner named. No single rupee figure is stated
+  as fact anywhere.
+- **The entity key is a proxy** for the host's true propagation key;
+  episode results are reported under alternate keys with the sensitivity
+  quantified (the core claim is key-robust; one secondary claim is
+  key-dependent and flagged).
+- **Measured precision is a lower bound** — the host acknowledges
+  unreported fraud is labeled legitimate, and our hand-inspected top
+  "false positives" include same-entity twins of labeled fraud.
+- **The 7-day label-availability delay is optimistic** (real chargebacks
+  mature over ~30–120 days), so every label-derived-feature gain we
+  report is an upper bound on its production value.
+
+## Results — the holdout, opened once
+
+Primary = the frozen day-112 pipeline; secondary = the same recipe refit
+through day 147 with nested calibration (never on the holdout). Holdout:
+92,427 rows / 32 days / 3,213 positives / **1,198 first-strike episodes**.
+
+| Model | AP | ROC-AUC |
+|---|---|---|
+| Primary A (frozen) | 0.5319 [0.5167, 0.5504] | 0.9033 [0.8972, 0.9099] |
+| Primary B (headline pick) | 0.7088 | 0.9544¹ |
+| Secondary A (refit d147) | 0.6001 [0.5843, 0.6176] | 0.9239 |
+
+¹ Above the competition winner's private 0.9459 — not a leak: B holds an
+information source no competition entrant had (labels ≥7 days old inside
+the evaluation window). A blocklist-echo model beating the competition
+ceiling *is the thesis*. The sanity ceiling applies to
+competition-comparable models; A sits at 0.9033.
+
+**The inversion survives out-of-time** (at the blocklist's natural
+N=1,775): blocklist 49.8% precision / **0** first strikes; A 69.9% / 566;
+B **89.1%** / 442. Precision rises as prevention falls.
+
+**The counters (100 alerts/day, 3,200 total)** — shipped two-lane+A2:
+**698 of 1,198 episodes stopped at strike one** against **692 alerts
+spent on already-known-bad entities** (single-lane B: 643 and 1,425),
+with 1,775 known-bad entities handled by the blocklist lane at zero alert
+cost (891 legitimate transactions blocked by that standing policy —
+counted, shown, future work). **B−A first-strike recall on holdout:
+−0.0192 [−0.0326, −0.0052]** — the headline winner is again significantly
+worse at prevention. Retraining cadence is worth **+0.068 AP**
+(primary → secondary). The console reproduces every counter from
+`holdout_replay.parquet` — the same swapped-parquet path proven in
+Stage 6.
+
 ## Why no graph model
 
 The plan reserved time for a graph-feature ablation. We skipped it — not
@@ -88,33 +189,6 @@ on a prediction, but on three measurements already in our reports:
 
 Showing this reasoning beats manufacturing a null we can already derive.
 
-## Read the limitations first
-
-This project's claims are only as strong as these caveats, so they come
-before any result:
-
-1. **The labels are propagated, not per-transaction.** The dataset's host
-   labeled the reported chargeback *and every later transaction linked to
-   the same user account, email address, or billing address* as fraud. The
-   positive class therefore mixes "the moment an episode started" with
-   "transactions a blocklist would have caught for free". Our central claim
-   is about the **metric distortion** this creates in model selection;
-   any operational magnitude we quote is dataset-specific.
-2. **Our held-out test set is self-carved.** The official `test.csv` labels
-   were never released, so we carve a chronological holdout (days 151–182)
-   from the training file, seal it in code (SHA-256 pinned, access-logged),
-   and open it exactly once. See `reports/holdout_access.log` — it should
-   contain exactly one entry.
-3. **Every economic figure is an assumption range, not a fact.** We are not
-   Razorpay and do not know their cost structure. Cost parameters are
-   declared ranges with a published sensitivity grid; no single rupee figure
-   is stated as fact.
-4. **The entity key is a proxy.** The published UID reconstruction
-   approximates the host's true propagation key; episode results are
-   reported under alternate keys with the sensitivity quantified.
-5. **Measured precision is a lower bound.** The host acknowledges unreported
-   fraud is labeled legitimate.
-
 ## Reproduce
 
 ```bash
@@ -132,12 +206,17 @@ uv run python scripts/stage4_policy.py       # decision engine + freeze
 uv run python scripts/stage4_episode_cost.py # episode-aware pricing
 uv run python scripts/stage6_prepare_replay.py    # console replay file
 uv run python -m strikeone.console           # -> http://127.0.0.1:8777
+# Stage 7 (already executed once; the run script refuses a second unseal):
+#   uv run python scripts/stage7_prepare.py
+#   uv run python scripts/stage7_run.py
 ```
 
-All randomness is seeded (`strikeone.config.SEED`). Runs on a laptop CPU; no
-cloud, no GPU. The console is self-contained (stdlib server, no auth, no
-database); its every number is computed from the replay file and the frozen
-Stage 4 config — swap `--data` to re-point it (Stage 7 does exactly that).
+All randomness is seeded (`strikeone.config.SEED`). Runs on a laptop CPU;
+no cloud, no GPU. Clean-clone reproduction is verified through
+`stage0_build` (byte-identical holdout hash) and the full test suite; the
+console is self-contained (stdlib server, no auth, no database) and every
+number it shows is computed from the replay file plus the frozen config —
+`--data data/processed/holdout_replay.parquet` shows the final numbers.
 
 ## Data: source, faithfulness, licensing
 
@@ -173,7 +252,10 @@ hosting and verify integrity.
 
 ## Layout
 
-- `src/strikeone/` — library (data, splits, seal, metrics, episodes)
-- `scripts/` — stage entry points
-- `reports/STAGE_N.md` — per-stage findings, written for a skeptical reader
+- `src/strikeone/` — library (data, seal, metrics, episodes, entity,
+  console); see `ARCHITECTURE.md` for the system and evaluation design
+- `scripts/` — one entry point per stage
+- `reports/STAGE_N.md` — per-stage findings, written for a skeptical
+  reader; `reports/holdout_prediction.md` — the pre-registration;
+  `reports/holdout_access.log` — the seal's one entry
 - `PROPOSALS.md` — judgment calls outside the build brief

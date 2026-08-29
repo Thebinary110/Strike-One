@@ -1,0 +1,104 @@
+{
+  "n_rows": 92427,
+  "n_days": 32,
+  "positives": 3213,
+  "n_episodes": 1198,
+  "lane1_rows": 1775,
+  "lane1_row_share": 0.0192,
+  "lane1_positive_share": 0.2751,
+  "propagated_share_of_positives": 0.6271,
+  "novel_uid_row_share_vs_pre151": 0.5488,
+  "item1_primary_A": {
+    "ap": [
+      0.5319264999076571,
+      0.5167087001472368,
+      0.5504175894638399
+    ],
+    "auc": [
+      0.9032764728830631,
+      0.8972064268059461,
+      0.9098573541653511
+    ],
+    "ap_in_range": false,
+    "auc_in_range": true
+  },
+  "item2_B": {
+    "ap": [
+      0.7087554006931374,
+      0.6945921899639397,
+      0.7238706435995632
+    ],
+    "auc": [
+      0.9543701893517736,
+      0.9509866454562861,
+      0.9577994614204147
+    ],
+    "b_minus_a_ap": [
+      0.1768289007854803,
+      0.16430855289515325,
+      0.18872424606259702,
+      0.0
+    ],
+    "in_predicted_range": false
+  },
+  "item3_inversion_at_N": {
+    "N": 1775,
+    "blocklist": {
+      "precision": 0.498,
+      "fs_catches": 0,
+      "fs_recall": 0.0
+    },
+    "A": {
+      "precision": 0.6992,
+      "fs_catches": 566,
+      "fs_recall": 0.4725
+    },
+    "B": {
+      "precision": 0.8907,
+      "fs_catches": 442,
+      "fs_recall": 0.3689
+    }
+  },
+  "item4_routing": {
+    "budget": 576,
+    "fs_recall_off": 0.0977,
+    "fs_recall_on": 0.2262,
+    "ratio": 2.32,
+    "in_predicted_range": true
+  },
+  "item5_fs_delta_B_minus_A": [
+    -0.019198664440734592,
+    -0.03262709325165619,
+    -0.005175550347077727,
+    0.999
+  ],
+  "item5_counters_shipped": {
+    "episodes_stopped_at_strike_one": 698,
+    "of_episodes": 1198,
+    "alerts_on_already_known_bad": 692,
+    "lane1_handled": 1775,
+    "lane1_legit_blocked": 891,
+    "false_positives": 1810
+  },
+  "item7_secondary_A": {
+    "ap": [
+      0.6000863852794251,
+      0.5843417827210898,
+      0.6175892447854313
+    ],
+    "auc": [
+      0.9238920448180666,
+      0.9184166884157818,
+      0.9296015743088699
+    ],
+    "ap_in_range": true,
+    "auc_in_range": true,
+    "retraining_delta_ap": 0.0682
+  },
+  "item7_secondary_counters": {
+    "episodes_stopped_at_strike_one": 712,
+    "alerts_on_already_known_bad": 718,
+    "fs_recall": 0.5943
+  },
+  "item8_loss_weighted_fs_recall": 0.4733
+}

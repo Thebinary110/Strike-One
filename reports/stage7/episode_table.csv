@@ -1,0 +1,5 @@
+system,model_alerts,fs_catches,redundant,false_pos,fs_recall,friction_eff,redundancy_rate,txn_precision
+two-lane+A2 (shipped),3200,698,692,1810,0.5826,0.2181,0.4978,0.4344
+single-lane B,3200,643,1425,1132,0.5367,0.2009,0.6891,0.6462
+single-lane A,3200,666,953,1581,0.5559,0.2081,0.5886,0.5059
+blocklist,1775,0,884,891,0.0,0.0,1.0,0.498
