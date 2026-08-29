@@ -176,6 +176,13 @@ def cmd_tui(args) -> int:
 
 
 def main(argv=None) -> None:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    # `tui` forwards everything (incl. --help) to the node app untouched
+    if argv[:1] == ["tui"]:
+        class _A:  # minimal shim
+            rest = argv[1:]
+        sys.exit(cmd_tui(_A))
+
     ap = argparse.ArgumentParser(
         prog="strikeone",
         description="Bring-your-own-scorer fraud routing and the corrected "
@@ -224,9 +231,8 @@ def main(argv=None) -> None:
                            "cost, amount units (15-60)")
             p.add_argument("--out", help="write recommendations to CSV")
 
-    p = sub.add_parser("tui", help="terminal UI (Ink; needs Node 18+)")
-    p.add_argument("rest", nargs="*")
-    p.set_defaults(fn=cmd_tui)
+    sub.add_parser("tui", help="terminal UI (Ink; needs Node 18+); "
+                               "strikeone tui --help for keys and usage")
 
     args = ap.parse_args(argv)
     try:
