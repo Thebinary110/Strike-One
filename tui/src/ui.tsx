@@ -1,5 +1,5 @@
 // Shared visual language. Restrained: a masthead, hairline rules, real
-// spacing. Colour ONLY on data: green = prevented, amber = wasted,
+// spacing. Colour ONLY on data: green = first-hit, amber = blocklist-coverable,
 // red = good customers harmed. No emoji, no spinner theatre.
 import React from 'react';
 import {Box, Text} from 'ink';

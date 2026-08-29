@@ -111,23 +111,23 @@ export const Audit = ({s, capIdx, width}: {s: Session; capIdx: number;
             </Box>
             <Box flexDirection="column">
               <Big s={pct(b.fs_recall, 0).replace('%', '')} color={C.stop} />
-              <Text color={C.dim}>% of fraud cases stopped</Text>
-              <Text color={C.dim}>on the first attempt</Text>
+              <Text color={C.dim}>% of cases caught at the</Text>
+              <Text color={C.dim}>first labelled transaction</Text>
             </Box>
             <Box flexDirection="column">
               <Big s={pct(b.redundancy_rate, 0).replace('%', '')}
                    color={C.waste} />
-              <Text color={C.dim}>% of correct alerts wasted on</Text>
-              <Text color={C.dim}>fraudsters already caught</Text>
+              <Text color={C.dim}>% of correct alerts a standing</Text>
+              <Text color={C.dim}>blocklist would also have covered</Text>
             </Box>
           </Box>
           <Text color={C.harm} bold>
             {`wrongly flagged good customers at this budget: ${fmt(b.false_positives)}`}
-            <Text color={C.dim}> (each worse than a wasted review)</Text>
+            <Text color={C.dim}> (each worse than a blocklist-coverable alert)</Text>
           </Text>
           <Box flexDirection="column">
             <Text color={C.dim}>
-              {'  alerts/day   headline   first-attempt   wasted-on-known   wrongly-flagged'}
+              {'  alerts/day   headline   first-hit      blk-coverable    wrongly-flagged'}
             </Text>
             {a.budgets.map((r: any, i: number) => (
               <Text key={r.per_day} inverse={i === capIdx}>
@@ -168,8 +168,8 @@ export const Route = ({s, width}: {s: Session; width: number}) => {
  legitimate: the standing policy's own cost, counted</Text> : null}</Text>
       {plot && (
         <Box flexDirection="column">
-          <Text color={C.dim}>share of fraud cases stopped on the first
- attempt, by review budget (same scorer, lane off vs on)</Text>
+          <Text color={C.dim}>share of cases caught first-hit,
+ by review budget (same scorer, lane off vs on)</Text>
           {plot.lines}
           <Box>
             <Text color={C.dim}>
@@ -187,7 +187,7 @@ export const Route = ({s, width}: {s: Session; width: number}) => {
               `${pct(prim.fs_recall_off, 1)} of fraud cases alone and ` +
               `${pct(prim.fs_recall_on, 1)} with the blocklist lane in front ` +
               `of it: ${prim.lift === Infinity ? 'from zero' : prim.lift.toFixed(2) + 'x'}` +
-              ` the prevention, zero model changes.`
+              ` the first-hit catches, zero model changes.`
             : `MEASURED: the blocklist lane adds nothing on this book ` +
               `(lift ${prim.lift.toFixed(2)}x at ${fmt(prim.per_day)}/day)` +
               (typeof r.lane1.legit_blocked === 'number'
@@ -311,7 +311,7 @@ export const Stream = ({s, shownRows, paused, width}: {s: Session;
               : <Text color={C.accent}>review</Text>}
             {'   '}
             {r.caught_fs
-              ? <Text color={C.stop} bold>FIRST ATTEMPT, STOPPED</Text>
+              ? <Text color={C.stop} bold>FIRST HIT, CAUGHT</Text>
               : r.role === 2
                 ? <Text color={C.waste}>already covered</Text>
                 : <Text color={C.dim}>{r.label === 0 ? 'legitimate' : ''}</Text>}
@@ -358,7 +358,7 @@ export const Case = ({s, reveal, width}: {s: Session; reveal: number;
         {fsX !== null && (
           <Text>
             {' '.repeat(Math.max(0, Math.min(fsX - 8, w - 18)))}
-            <Text color={C.harm} bold>THE FIRST ATTEMPT</Text>
+            <Text color={C.harm} bold>THE FIRST HIT</Text>
           </Text>
         )}
         <Text>
@@ -376,22 +376,22 @@ export const Case = ({s, reveal, width}: {s: Session; reveal: number;
               {' '.repeat(Math.max(0, Math.min(bandStart,
                 w - 62)))}
               <Text color={C.waste}>already covered by the blocklist.
- catching these prevents nothing</Text>
+ a standing blocklist would also have covered these</Text>
             </Text>
           </>
         )}
       </Box>
       <Text color={C.dim}>
-        ● normal purchase   <Text color={C.harm}>◆ the first attempt</Text>
-        {'   '}<Text color={C.waste}>▲ later attempt, already covered</Text>
+        ● normal purchase   <Text color={C.harm}>◆ the first hit</Text>
+        {'   '}<Text color={C.waste}>▲ later attempt, blocklist-coverable</Text>
       </Text>
       <Box flexDirection="column">
         {shown.slice(-6).map((r, i) => (
           <Text key={i} color={r.role === 1 ? C.harm
             : r.role === 2 ? C.waste : C.dim}>
             {`  day ${r.day.toFixed(2).padStart(6)}   amount ${r.amount.toFixed(2).padStart(9)}   `}
-            {r.role === 1 ? 'THE FIRST ATTEMPT'
-              : r.role === 2 ? 'later attempt, already covered'
+            {r.role === 1 ? 'THE FIRST HIT'
+              : r.role === 2 ? 'later attempt, blocklist-coverable'
               : 'normal purchase'}
           </Text>
         ))}

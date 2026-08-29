@@ -3,7 +3,7 @@
 # Strike One
 
 **One command that tells you how much of your fraud metric is
-remembering fraudsters instead of preventing fraud.**
+re-catching fraudsters it already knew about.**
 
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB)
 ![License](https://img.shields.io/badge/license-Apache--2.0-green)
@@ -14,11 +14,11 @@ remembering fraudsters instead of preventing fraud.**
 
 Fraud labels propagate: once a fraudster is confirmed, all their later
 attempts get labelled fraud too. Standard metrics credit a model for
-re-catching them, even though a simple blocklist catches them for free.
+re-catching them, alerts a standing blocklist would also have covered.
 Strike One measures that gap on **your** data, with **your** model.
 
-- `strikeone audit` - your headline metric vs fraud cases stopped on the
-  **first attempt**, wasted reviews, and what a blocklist gets you free
+- `strikeone audit` - your headline metric vs fraud cases caught at their
+  **first labelled transaction**, blocklist-coverable alerts, and what a blocklist gets you free
 - `strikeone route` - wrap the scorer you already run with a blocklist
   lane, and measure the lift (or learn it would not help, honestly)
 - `strikeone policy` - your costs in, approve / verify / block out
@@ -88,7 +88,7 @@ ONE THING TO DO NEXT
   your 7-day label maturity. Measure it: strikeone route <your file>
 
 AT OTHER REVIEW BUDGETS
-  reviews/day txns caught stopped 1st wasted-on-known good flagged
+  reviews/day txns caught stopped 1st blocklist-coverable good flagged
             1        1.0%        1.6%           25.8%            0
             2        2.0%        2.7%           38.1%            0
             5        4.9%        6.1%           43.3%            2
@@ -158,12 +158,12 @@ keyboard-driven, runs offline over stdio to the local Python core.
 ## How it works
 
 1. Your rows are sorted chronologically; a fraud **case** is one
-   entity's run of fraud, and only its **first attempt** ever prevented
-   a loss.
+   entity's run of fraud, and only its **first labelled transaction** was ever
+   catchable before the entity was known.
 2. A point-in-time blocklist is simulated from your labels and your
    stated label delay: what a lookup table would already have known.
 3. Every alert your scorer would raise, at your review capacity, is
-   classified: first-attempt stop, later attempt (blocklist-coverable),
+   classified: first-hit catch, later attempt (blocklist-coverable),
    or flagged good customer.
 4. All comparisons are budget-matched; nothing is compared at different
    alert counts.

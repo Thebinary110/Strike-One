@@ -1,5 +1,14 @@
 # The repackaging — what ships changed, what we found did not
 
+> **Terminology revision (2026-08-30).** Later review standardised the
+> project's vocabulary: what this report calls "wasted" / "redundant"
+> alerts are now "blocklist-coverable" (alerts a standing blocklist would
+> also have covered), "first strike / first attempt" is "first hit / the
+> case's first labelled transaction", and causal phrasings such as
+> "prevented a loss" are replaced by "caught at the case's first labelled
+> transaction". This report keeps its original wording; rewriting history
+> silently would undercut the integrity story it documents.
+
 The reviewer's course correction: the useful artifact is the METHOD (the
 blocklist routing lane plus the corrected evaluation), not our model.
 `strikeone` is now an installable bring-your-own-scorer package with a CLI

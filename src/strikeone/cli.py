@@ -121,7 +121,7 @@ why these numbers differ from reports/stage7 (they should, and here is how):
     headline AP 0.5319 is Baseline A, and its 698/1,198 counters are the
     two-lane SYSTEM (blocklist lane + A2), not a bare scorer
   window truncation: fraudsters already active before day 151 look like
-    fresh first attempts inside this file, inflating cases to 1,462 vs
+    fresh first hits inside this file, inflating cases to 1,462 vs
     stage 7's full-stream 1,198 (and the blocklist to 566 flags at 73.0%
     vs 1,775 at 49.8%). Disclosed in the footer; --history removes it
   alerts: 100/day x the exact 31.9985-day span = 3,199 vs stage 7's 3,200
@@ -210,7 +210,7 @@ def main(argv=None) -> None:
             p.add_argument("--history",
                            help="file of entity ids flagged BEFORE this "
                                 "window (one per line, or csv/parquet with "
-                                "an entity column); tightens first-attempt "
+                                "an entity column); tightens first-hit "
                                 "counts from upper bound to measured")
             p.add_argument("--verbose", action="store_true",
                            help="add the technical block (episodes, friction "

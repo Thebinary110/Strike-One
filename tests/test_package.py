@@ -84,7 +84,7 @@ def test_audit_hand_numbers():
     assert r.blocklist["recovered_rows"] == 1
     assert r.blocklist["first_strike_catches"] == 0
     assert r.headline["ap"] > 0.9  # scores rank frauds on top here
-    assert "first attempt" in r.sentence
+    assert "first labelled transaction" in r.sentence
 
 
 def test_route_lift_and_lane1():
@@ -156,21 +156,21 @@ def test_blocklist_comparison_is_budget_matched():
     assert r.blocklist["scorer_fs_catches_same_n"] == 1
 
 
-def test_next_action_derives_from_wasted_column():
+def test_next_action_derives_from_coverable_column():
     # regression: 'reviews freed/day' once used a different computation
-    # than the wasted-on-known column and contradicted it on screen
+    # than the blocklist-coverable column and contradicted it on screen
     df, _ = mapped()
     r = audit(df, label_delay_days=7.0)
     pr = next(x for x in r.budgets if x["primary"])
-    wasted_per_day = pr["redundant"] / max(r.stats["days"], 1)
+    coverable_per_day = pr["blocklist_coverable"] / max(r.stats["days"], 1)
     text = r.to_text()
-    if wasted_per_day >= 0.5:
-        assert f"about {wasted_per_day:.0f} of your" in text
+    if coverable_per_day >= 0.5:
+        assert f"about {coverable_per_day:.0f} of your" in text
     # and the budget rows always reconcile internally
     for row in r.budgets:
         assert row["hits"] + row["false_positives"] == row["budget"]
         assert row["fs_catches"] <= row["hits"]
-        assert row["redundant"] <= row["hits"]
+        assert row["blocklist_coverable"] <= row["hits"]
 
 
 def test_history_reclassifies_prewindow_cases():

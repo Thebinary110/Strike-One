@@ -1,5 +1,14 @@
 # Stage 3 — The episode engine
 
+> **Terminology revision (2026-08-30).** Later review standardised the
+> project's vocabulary: what this report calls "wasted" / "redundant"
+> alerts are now "blocklist-coverable" (alerts a standing blocklist would
+> also have covered), "first strike / first attempt" is "first hit / the
+> case's first labelled transaction", and causal phrasings such as
+> "prevented a loss" are replaced by "caught at the case's first labelled
+> transaction". This report keeps its original wording; rewriting history
+> silently would undercut the integrity story it documents.
+
 ## Surprises first
 
 1. **The fragmentation prerequisite caught a fatal-class bug before it

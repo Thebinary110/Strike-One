@@ -26,7 +26,7 @@ sentence.
 
 **A numeric collision, documented so nobody infers a link:** the
 standalone-window audit (`strikeone audit --example ieee-cis`, the README
-hero) reports **733** redundant alerts for the bare A2 scorer at 100/day
+hero) reports **733** blocklist-coverable alerts for the bare A2 scorer at 100/day
 within its own window. C5 above also contains a **733** (the
-between-systems difference in wasted alerts, 1,425 vs 692). These are
+between-systems difference in blocklist-coverable alerts, 1,425 vs 692). These are
 unrelated quantities that happen to coincide numerically.

@@ -1,5 +1,14 @@
 # Stage 6 — The product surface
 
+> **Terminology revision (2026-08-30).** Later review standardised the
+> project's vocabulary: what this report calls "wasted" / "redundant"
+> alerts are now "blocklist-coverable" (alerts a standing blocklist would
+> also have covered), "first strike / first attempt" is "first hit / the
+> case's first labelled transaction", and causal phrasings such as
+> "prevented a loss" are replaced by "caught at the case's first labelled
+> transaction". This report keeps its original wording; rewriting history
+> silently would undercut the integrity story it documents.
+
 > **Addendum 3 (design pass, presentation only).** Light theme shipped as
 > default (identity: ink on off-white; semantic colour on data only; hard
 > hairline rules instead of cards; asymmetric hero with the delta

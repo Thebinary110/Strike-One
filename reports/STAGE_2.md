@@ -1,5 +1,14 @@
 # Stage 2 — Entity intelligence
 
+> **Terminology revision (2026-08-30).** Later review standardised the
+> project's vocabulary: what this report calls "wasted" / "redundant"
+> alerts are now "blocklist-coverable" (alerts a standing blocklist would
+> also have covered), "first strike / first attempt" is "first hit / the
+> case's first labelled transaction", and causal phrasings such as
+> "prevented a loss" are replaced by "caught at the case's first labelled
+> transaction". This report keeps its original wording; rewriting history
+> silently would undercut the integrity story it documents.
+
 > **Correction (Stage 3 prerequisite audit).** The Stage 3 fragmentation
 > check caught a pandas-3 regression in UID construction: `astype(str)`
 > propagates NA instead of writing a literal `"nan"`, so fallback rows

@@ -10,7 +10,7 @@ what was assumed and NOT measured.
 The default output is written for a payments ops lead, fits a standard
 terminal, and must stand on its own pasted into Slack with colour
 stripped. Technical detail lives in --verbose and --json. Colour is
-green = prevented, amber = wasted, red = harm, nothing else, and only on
+green = first-hit catches, amber = blocklist-coverable, red = harm, nothing else, and only on
 a TTY without NO_COLOR.
 """
 
@@ -106,25 +106,24 @@ class AuditResult:
 
             # c) the number nobody has
             L.append(b("THE NUMBER NOBODY HAS"))
-            L.append("  " + g(f"{pr['fs_recall']:.1%} of fraud CASES stopped "
-                              "on the very first attempt"))
-            L.append(f"  at those same {pr['per_day']:,} reviews/day. That is "
-                     "the only moment a loss")
-            L.append("  is prevented; everything after it, a blocklist "
-                     "catches for free.")
+            L.append("  " + g(f"{pr['fs_recall']:.1%} of fraud CASES caught "
+                              "at their first labelled transaction"))
+            L.append(f"  at those same {pr['per_day']:,} reviews/day. "
+                     "Everything after a case's first")
+            L.append("  transaction, a standing blocklist would also have "
+                     "covered.")
             L.append("")
 
             # d) where the budget went: the honest single-system framing
             L.append(b("WHERE YOUR ALERTS WENT"))
             L.append(f"  of {pr['budget']:,} alerts spent:")
-            L.append("  " + g(f"{pr['fs_catches']:>6,}") + "  stopped a fraud "
-                     "case at its first attempt: the only alerts")
-            L.append("          that prevented a loss")
-            L.append("  " + a(f"{pr['redundant']:>6,}") + "  were later "
-                     "attempts in cases that had already begun")
-            L.append(f"          ({pr['redundancy_rate']:.0%} of your correct "
-                     "alerts); a blocklist catches these")
-            L.append("          for free")
+            L.append("  " + g(f"{pr['fs_catches']:>6,}") + "  caught a case "
+                     "at its first labelled transaction")
+            L.append("  " + a(f"{pr['blocklist_coverable']:>6,}") + "  were "
+                     "alerts a standing blocklist would also have covered")
+            L.append(f"          ({pr['blocklist_coverable_rate']:.0%} of "
+                     "your correct alerts: later attempts in")
+            L.append("          cases that had already begun)")
             L.append("  " + r(f"{pr['false_positives']:>6,}") + "  flagged "
                      "good customers")
             L.append("")
@@ -139,25 +138,25 @@ class AuditResult:
                 sp = bl["scorer_precision_same_n"]
                 L.append(f"  by flagging {nb:,} transactions at "
                          f"{bl['precision']:.1%} precision, with "
-                         + r("0") + " first-attempt stops.")
+                         + r("0") + " first-hit counts.")
                 L.append(f"  At the same {nb:,} alerts your scorer reaches "
                          f"{sp:.1%} precision and stops")
                 L.append(f"  {bl['scorer_fs_catches_same_n']:,} cases "
-                         "first-attempt. "
-                         + ("The blocklist is still more precise there;"
+                         "first-hit. "
+                         + ("The blocklist is still more precise there:"
                             if bl["precision"] > sp else
-                            "Respectable precision, zero prevention:")
+                            "Respectable precision, zero first hits:")
                          )
-                L.append("  precision without prevention is exactly what it "
-                         "sells.")
+                L.append("  precision with no first-hit catches is exactly "
+                         "what it sells.")
             L.append("")
 
             # f) one concrete action, derived from the SAME numbers as the
-            # wasted-on-known column above, so they can never diverge
+            # blocklist-coverable column above, so they can never diverge
             L.append(b("ONE THING TO DO NEXT"))
-            wasted_pd = pr["redundant"] / max(s["days"], 1)
-            if wasted_pd >= 0.5:
-                L.append("  " + a(f"about {wasted_pd:.0f} of your "
+            coverable_pd = pr["blocklist_coverable"] / max(s["days"], 1)
+            if coverable_pd >= 0.5:
+                L.append("  " + a(f"about {coverable_pd:.0f} of your "
                                   f"{pr['per_day']:,} reviews/day")
                          + " went to cases that had already")
                 L.append("  begun. How many of those a blocklist lane "
@@ -174,14 +173,14 @@ class AuditResult:
             # the working table, compact
             L.append(b("AT OTHER REVIEW BUDGETS"))
             L.append(f"  {'reviews/day':>11} {'txns caught':>11} "
-                     f"{'stopped 1st':>11} {'wasted-on-known':>15} "
+                     f"{'first-hit':>11} {'blk-coverable':>15} "
                      f"{'good flagged':>12}")
             for row in self.budgets:
                 mark = " <-capacity" if row["primary"] else ""
                 L.append(f"  {row['per_day']:>11,} "
                          f"{row['headline_recall']:>11.1%} "
                          f"{row['fs_recall']:>11.1%} "
-                         f"{row['redundancy_rate']:>15.1%} "
+                         f"{row['blocklist_coverable_rate']:>15.1%} "
                          f"{row['false_positives']:>12,}{mark}")
             L.append("")
         else:
@@ -194,7 +193,7 @@ class AuditResult:
                      + a(f"{bl['recovered_share']:.1%}")
                      + " of your labelled fraud at")
             L.append(f"  {bl['precision']:.1%} precision, stopping "
-                     + r("0") + " cases on the first attempt")
+                     + r("0") + " cases at the first labelled transaction")
             L.append("")
 
         if verbose:
@@ -209,7 +208,7 @@ class AuditResult:
                 effs = ", ".join(
                     f"{x['per_day']}/d={x['friction_efficiency']:.1%}"
                     for x in self.budgets[:6])
-                L.append("  friction efficiency (first-attempt catches per "
+                L.append("  friction efficiency (first-hit catches per "
                          f"review): {effs}")
             L.append("")
 
@@ -220,12 +219,12 @@ class AuditResult:
             L.append("  cases are bounded by this file plus your supplied "
                      "history; entities")
             L.append("  flagged before the window were excluded from "
-                     "first-attempt counts.")
+                     "first-hit counts.")
         else:
             L.append("  cases are bounded by this file. Any fraudster "
                      "already active before it")
-            L.append("  starts counts here as a first attempt, so "
-                     "first-attempt stops are an")
+            L.append("  starts counts here as a first hit, so "
+                     "first-hit counts are an")
             L.append("  upper bound. A longer window, or --history, "
                      "tightens it.")
         L.append(f"  Fraud labels mature in {s['label_delay_days']:g} days "
@@ -285,7 +284,7 @@ def audit(df: pd.DataFrame, label_delay_days: float = 7.0,
 
     roles = episodes.episode_roles(ent, t, y, tiebreak=tb)
     # prior-window history: an entity flagged before this window cannot
-    # produce a first attempt inside it. Reclassify, and count it.
+    # produce a first hit inside it. Reclassify, and count it.
     cases_reclassified = 0
     hist_mask = np.zeros(n, dtype=bool)
     if history_entities:
@@ -361,11 +360,11 @@ def audit(df: pd.DataFrame, label_delay_days: float = 7.0,
             red = int((alert & prop).sum())
             res.budgets.append({
                 "per_day": per_day, "budget": budget,
-                "hits": on_pos, "redundant": red, "fs_catches": fs_c,
+                "hits": on_pos, "blocklist_coverable": red, "fs_catches": fs_c,
                 "headline_recall": on_pos / pos if pos else 0.0,
                 "false_positives": int(budget - on_pos),
                 "fs_recall": fs_c / n_eps if n_eps else 0.0,
-                "redundancy_rate": red / on_pos if on_pos else 0.0,
+                "blocklist_coverable_rate": red / on_pos if on_pos else 0.0,
                 "friction_efficiency": fs_c / budget if budget else 0.0,
                 "precision": on_pos / budget if budget else 0.0,
                 "primary": per_day == primary,
@@ -383,12 +382,12 @@ def audit(df: pd.DataFrame, label_delay_days: float = 7.0,
             blocklist["scorer_fs_catches_same_n"] = int((al_bl & fs).sum())
         res.sentence = (
             f"Of the {pr['budget']:,} alerts you spent, {pr['hits']:,} hit "
-            f"fraud, and {pr['redundant']:,} of those "
-            f"({pr['redundancy_rate']:.0%} of your correct alerts) were "
-            f"later attempts in cases that had already begun. Those "
-            f"prevented nothing a blocklist would not have caught for "
-            f"free. {pr['fs_catches']:,} alerts stopped a case at its "
-            f"first attempt: the only alerts that prevented a loss."
+            f"fraud, and {pr['blocklist_coverable']:,} of those "
+            f"({pr['blocklist_coverable_rate']:.0%} of your correct alerts) "
+            f"were alerts a standing blocklist would also have covered: "
+            f"later attempts in cases that had already begun. "
+            f"{pr['fs_catches']:,} alerts caught a case at its first "
+            f"labelled transaction."
         )
     else:
         res.sentence = (
