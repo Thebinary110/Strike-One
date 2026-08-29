@@ -1,0 +1,26 @@
+scoring A, A2, B ...
+1.  budget                system  alerts  fs_recall  lw_fs_recall  precision  blocklist_coverable_share  false_positives
+   3200                random    3200     0.0384        0.0342     0.0338                     0.5741             3092
+   3200        rank-by-amount    3200     0.0534        0.3447     0.0553                     0.6384             3023
+   3200         single-lane A    3200     0.5559        0.4382     0.5059                     0.5886             1581
+   3200         single-lane B    3200     0.5367        0.3958     0.6462                     0.6891             1132
+   3200        single-lane A2    3200     0.5751        0.4636     0.4759                     0.5476             1677
+   3200 two-lane+A2 (shipped)    4975     0.5826        0.4733     0.4571                     0.6931             2701
+2. d=1: {'delay_days': 1, 'lane1_flags': 2362, 'coverage_of_fraud': 0.3881, 'lane1_precision': 0.5279, 'shipped_fs_recall': 0.591, 'B_fs_recall': 0.5367, 'delta_shipped_minus_B': 0.0543, 'delta_ci_lo': 0.0411, 'delta_ci_hi': 0.0676}
+2. d=3: {'delay_days': 3, 'lane1_flags': 2086, 'coverage_of_fraud': 0.3287, 'lane1_precision': 0.5062, 'shipped_fs_recall': 0.5843, 'B_fs_recall': 0.5367, 'delta_shipped_minus_B': 0.0476, 'delta_ci_lo': 0.034, 'delta_ci_hi': 0.0606}
+2. d=7: {'delay_days': 7, 'lane1_flags': 1775, 'coverage_of_fraud': 0.2751, 'lane1_precision': 0.498, 'shipped_fs_recall': 0.5826, 'B_fs_recall': 0.5367, 'delta_shipped_minus_B': 0.0459, 'delta_ci_lo': 0.0328, 'delta_ci_hi': 0.0581}
+2. d=14: {'delay_days': 14, 'lane1_flags': 1542, 'coverage_of_fraud': 0.2319, 'lane1_precision': 0.4831, 'shipped_fs_recall': 0.581, 'B_fs_recall': 0.5367, 'delta_shipped_minus_B': 0.0442, 'delta_ci_lo': 0.0316, 'delta_ci_hi': 0.0571}
+2. d=30: {'delay_days': 30, 'lane1_flags': 1252, 'coverage_of_fraud': 0.1821, 'lane1_precision': 0.4673, 'shipped_fs_recall': 0.5801, 'B_fs_recall': 0.5367, 'delta_shipped_minus_B': 0.0434, 'delta_ci_lo': 0.0308, 'delta_ci_hi': 0.0565}
+3. {
+  "k_of_81_ci_excludes_zero": 81,
+  "median_edge_pct_of_approve_all": 14.429,
+  "iqr": [
+    9.256,
+    20.474
+  ],
+  "min_edge": 3.352,
+  "counterfactual_assumption": "a blocked fraudulent transaction is assumed fully avoided; a stepped-up one is avoided with probability e (liability shift s=0 here). Sensitivity to this assumption is the e (and s) dimension of the declared grid."
+}
+ACCESS LOG now has exactly two entries:
+  2026-08-29T12:54:46+00:00  UNSEALED  sha256=e053295839390770dd8f4ecaf4214016982830e898fea7c4738587f5db12f499  
+  2026-08-29T19:03:44+00:00  UNSEALED  sha256=e053295839390770dd8f4ecaf4214016982830e898fea7c4738587f5db12f499  

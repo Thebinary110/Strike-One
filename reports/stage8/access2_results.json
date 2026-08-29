@@ -1,0 +1,19 @@
+{
+  "prereg_commit": "67d35f7",
+  "item1_primary": {
+    "rank_by_amount_lw_fs": 0.3447,
+    "shipped_lw_fs": 0.4733,
+    "random_lw_fs": 0.0342
+  },
+  "item2_reversal": false,
+  "item3": {
+    "k_of_81_ci_excludes_zero": 81,
+    "median_edge_pct_of_approve_all": 14.429,
+    "iqr": [
+      9.256,
+      20.474
+    ],
+    "min_edge": 3.352,
+    "counterfactual_assumption": "a blocked fraudulent transaction is assumed fully avoided; a stepped-up one is avoided with probability e (liability shift s=0 here). Sensitivity to this assumption is the e (and s) dimension of the declared grid."
+  }
+}
