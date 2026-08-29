@@ -53,8 +53,13 @@ class Replay:
         self.data_path = str(data_path)
         self.frozen = json.loads(frozen_path.read_text())
         self.central = self.frozen["cost_params_central"]
+        self.ranges = self.frozen["cost_params_ranges"]
         self.iso_x = np.array(self.frozen["calibration"]["isotonic_x"])
         self.iso_y = np.array(self.frozen["calibration"]["isotonic_y"])
+        # committed Stage 4 grid (validation-priced): used only to surface
+        # the corner where our advantage vanishes; never recomputed here
+        grid_path = config.REPORTS / "stage4" / "episode_cost_grid.csv"
+        self.grid = pd.read_csv(grid_path) if grid_path.exists() else None
 
         d = self.df
         self.n = len(d)
@@ -208,35 +213,103 @@ class Replay:
         )
         return out
 
+    # -------------------------------------------------------------- policy
+    def _clamp_params(self, q: dict) -> M.CostParams:
+        """Operator economics, clamped to the DECLARED ranges. Policy inputs
+        only: model, calibration, and config stay frozen."""
+        def g(name, key):
+            lo, hi = self.ranges[key][0], self.ranges[key][-1]
+            v = float(q.get(name, self.central[key]))
+            return min(max(v, lo), hi)
+        return M.CostParams(m=g("m", "m"), a=g("a", "a"),
+                            e=g("e", "e"), c_h=g("c_h", "c_h"))
+
+    def policy(self, q: dict) -> dict:
+        prm = self._clamp_params(q)
+        lane2 = ~self.flag
+        p = self.df["p_shipped"].to_numpy()[lane2]
+        amt2 = self.amount[lane2]
+        y2 = self.y[lane2]
+        ec = M.expected_cost_matrix(p, amt2, prm)
+        act = ec.argmin(axis=1)
+        cost2 = float(M.realized_cost(y2, act, amt2, prm).sum())
+        y1, a1 = self.y[self.flag], self.amount[self.flag]
+        cost1 = float(M.realized_cost(y1, np.full(len(y1), 2), a1, prm).sum())
+        cost = cost1 + cost2
+        approve_all = float(M.realized_cost(
+            self.y, np.zeros(self.n), self.amount, prm).sum())
+        bl_only = cost1 + float(M.realized_cost(
+            y2, np.zeros(len(y2)), amt2, prm).sum())
+        mix = np.bincount(act, minlength=3)
+        # nearest committed grid corner: does the headline system win there?
+        corner = None
+        if self.grid is not None:
+            g = self.grid
+            dist = ((g["m"] - prm.m).abs() / .2 + (g["a"] - prm.a).abs() / .15
+                    + (g["e"] - prm.e).abs() / .35 + (g["c_h"] - prm.c_h).abs() / 45)
+            row = g.loc[dist.idxmin()]
+            corner = {
+                "delta_per_1k": float(row["delta_headline_minus_ours_per_1k"]),
+                "headline_cheaper_here": bool(
+                    row["delta_headline_minus_ours_per_1k"] < 0),
+                "corner": {k: float(row[k]) for k in ["m", "a", "e", "c_h"]},
+            }
+        return {
+            "params": prm.__dict__, "ranges": self.ranges,
+            "mix": {"approve": int(mix[0]), "step_up": int(mix[1]),
+                    "block": int(mix[2]),
+                    "pct": [round(float(v) / len(act) * 100, 1) for v in mix]},
+            "cost_policy": round(cost, 0),
+            "cost_approve_all": round(approve_all, 0),
+            "cost_blocklist_only": round(bl_only, 0),
+            "savings_vs_approve_all": round((approve_all - cost) / approve_all, 4),
+            "validation_grid_corner": corner,
+        }
+
     # ------------------------------------------------------ decision object
-    def score_tx(self, tid: int) -> dict:
+    def score_tx(self, tid: int, q: dict | None = None) -> dict:
         g = self.df[self.df["TransactionID"] == tid]
         if g.empty:
             return {"error": f"TransactionID {tid} not in replay slice"}
         r = g.iloc[0]
         p = float(r["p_shipped"])
         A = float(r["amount"])
-        cp = self.central
+        prm = self._clamp_params(q or {})
+        m, a, e, ch = prm.m, prm.a, prm.e, prm.c_h
         ec = {
-            "approve": p * (A + cp["c_h"]),
-            "step-up": p * (1 - cp["e"]) * (A + cp["c_h"])
-                       + (1 - p) * cp["a"] * cp["m"] * A,
-            "block": (1 - p) * cp["m"] * A,
+            "approve": p * (A + ch),
+            "step_up": p * (1 - e) * (A + ch) + (1 - p) * a * m * A,
+            "block": (1 - p) * m * A,
         }
+        # risk levels at which the recommendation changes, at this amount
+        p_su = a * m * A / (e * (A + ch) + a * m * A)
+        p_bl = m * A * (1 - a) / ((1 - e) * (A + ch) + m * A * (1 - a))
         lane1 = bool(r["lane1_flag"])
+        action = (2 if lane1
+                  else int(np.argmin([ec["approve"], ec["step_up"], ec["block"]])))
+        # entity context: what the system could know at decision time
+        same = self.df[self.df["uid"] == r["uid"]]
+        before = same[same["t"] < r["t"]]
         return {
             "TransactionID": _js(r["TransactionID"]),
             "amount": A,
-            "lane": "lane-1 (blocklist)" if lane1 else "lane-2 (model)",
+            "uid": r["uid"],
+            "lane": "auto-blocked (already known)" if lane1 else "scored by model",
+            "lane_technical": "lane-1 (blocklist)" if lane1 else "lane-2 (model)",
             "entity_state_point_in_time": (
-                "already flagged — known fraud >= 7 days old on this entity"
-                if lane1 else "no prior flags"
+                "this customer identity already has a confirmed fraud at least "
+                "7 days old" if lane1 else "no prior confirmed fraud on this "
+                "customer identity"
             ),
-            "calibrated_p": None if lane1 else round(p, 5),
+            "entity_prior_txns_in_window": int(len(before)),
+            "risk": None if lane1 else round(p, 5),
             "expected_cost": None if lane1 else {k: round(v, 3) for k, v in ec.items()},
-            "action": "block (by rule)" if lane1
-                      else ACTION_NAMES[int(r["action_central"])],
-            "cost_params": cp,
+            "action": "block (by rule)" if lane1 else ACTION_NAMES[action],
+            "would_change": None if lane1 else {
+                "step_up_if_risk_above": round(float(p_su), 5),
+                "block_if_risk_above": round(float(p_bl), 5),
+            },
+            "cost_params": prm.__dict__,
             "ground_truth_role_EVALUATION_ONLY": {
                 0: "legit", 1: "first strike", 2: "propagated"
             }[int(r["role"])],
@@ -252,7 +325,9 @@ class Replay:
             "positives": int(self.y.sum()),
             "lane1": self.lane1,
             "central_params": self.central,
+            "param_ranges": self.ranges,
             "frozen_scorer": self.frozen["lane2_scorer"],
+            "frozen_hash": self.frozen.get("lane2_model_sha256", "")[:12],
             "latency": self.latency,
         }
 
@@ -306,7 +381,9 @@ def make_handler(replay: Replay):
                 elif u.path == "/api/featured":
                     self._json(replay.featured())
                 elif u.path == "/api/score":
-                    self._json(replay.score_tx(int(q["tid"])))
+                    self._json(replay.score_tx(int(q["tid"]), q))
+                elif u.path == "/api/policy":
+                    self._json(replay.policy(q))
                 else:
                     self._json({"error": "not found"}, 404)
             except Exception as e:  # noqa: BLE001 — surface to the client

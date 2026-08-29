@@ -38,6 +38,8 @@ def replay(tmp_path):
         "lane2_scorer": "A2",
         "calibration": {"isotonic_x": [0.0, 1.0], "isotonic_y": [0.0, 1.0]},
         "cost_params_central": {"m": 0.15, "a": 0.125, "e": 0.775, "c_h": 30.0},
+        "cost_params_ranges": {"m": [0.05, 0.15, 0.25], "a": [0.05, 0.125, 0.20],
+                               "e": [0.60, 0.775, 0.95], "c_h": [15.0, 30.0, 60.0]},
     }))
     return Replay(data, frozen)
 
@@ -82,9 +84,20 @@ def test_budget_capped_by_population(replay):
 
 def test_decision_object(replay):
     d = replay.score_tx(4)
-    assert d["lane"].startswith("lane-1")
+    assert d["lane_technical"].startswith("lane-1")
     assert d["action"] == "block (by rule)"
     d2 = replay.score_tx(2)
-    assert d2["lane"].startswith("lane-2")
-    assert set(d2["expected_cost"]) == {"approve", "step-up", "block"}
+    assert d2["lane_technical"].startswith("lane-2")
+    assert set(d2["expected_cost"]) == {"approve", "step_up", "block"}
+    assert d2["would_change"]["block_if_risk_above"] > \
+        d2["would_change"]["step_up_if_risk_above"]
     assert d2["ground_truth_role_EVALUATION_ONLY"] == "first strike"
+
+
+def test_policy_clamps_to_declared_ranges(replay):
+    p = replay.policy({"m": "9.9", "a": "0", "e": "0.7", "c_h": "1"})
+    assert p["params"]["m"] == 0.25      # clamped to range max
+    assert p["params"]["a"] == 0.05      # clamped to range min
+    assert p["params"]["c_h"] == 15.0
+    assert p["mix"]["approve"] + p["mix"]["step_up"] + p["mix"]["block"] == 4
+    assert p["cost_approve_all"] >= 0

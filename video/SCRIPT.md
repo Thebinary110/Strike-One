@@ -56,26 +56,33 @@ Optional 8s, only with the caveat in the same breath [C8]:
 
 ## 2:00–3:15 · The console, live — screen recording, one take
 
-Console on the HOLDOUT replay. Drive: default 100/day → slider down to
-18/day → scorer "headline B" → routing OFF → routing ON. FP counter
-visible throughout.
+Console on the HOLDOUT replay. Both systems are permanently side by side;
+the delta sits between them. Drive: default 100/day → drag the capacity
+playhead down to 18/day → tick "Auto-block known fraudsters" under the
+standard pick → untick → click one decision row for the why panel. The
+"good customers wrongly flagged" numbers stay on screen throughout.
 
-> This is the holdout replaying through the shipped system. Review
-> capacity: one hundred alerts a day — the honest-worst operating point
-> for my system, the one where the approaches converge. Every number here
-> recomputes live from the frozen pipeline.
+> This is the held-out month replaying through the frozen system, both
+> systems at once, same budget. At a hundred alerts a day: fifty-five
+> more fraud cases stopped at the first attempt, seven hundred
+> thirty-three fewer reviews wasted, at the price of six hundred
+> seventy-eight more wrongly flagged customers. All three numbers stay on
+> screen.
 >
-> (slider to 18/day) Tighten capacity toward what a real risk team
-> actually runs, and the ranking starts to matter.
+> (drag playhead to 18/day) Tighten capacity to what a small risk team
+> actually has, and watch the gap. The standard pick collapses to
+> zero-point-one-zero first-attempt recall; this system holds
+> zero-point-two-two [C4].
 >
-> (scorer → headline B, routing OFF) Here's the model everyone would
-> build, on its own: first-strike recall zero-point-one-zero at this
-> budget [C4].
+> (tick the auto-block checkbox under the standard pick) And here's the
+> product. Give their model the blocklist lane, zero model changes, and
+> it recovers to zero-point-two-three. Two point three times the
+> prevention, free [C4]. The routing protects any scorer. It works on
+> their engine, not just mine.
 >
-> (routing ON) Put an explicit blocklist lane in front of it — zero model
-> changes — and it's zero-point-two-three. Two point three times the
-> prevention, for free [C4]. This is the actual product. It isn't my
-> model. It works on their engine, not just mine.
+> (click a decision row, why panel opens, ~8s) Every decision explains
+> itself: the risk, what the system knew, the cost of each option at your
+> economics, and exactly what would have changed the outcome.
 
 ## 3:15–4:00 · The honest ledger — SLIDE 6
 

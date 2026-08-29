@@ -1,5 +1,29 @@
 # Stage 6 — The product surface
 
+> **Addendum 2 (operator-grade frontend, presentation only).** The console
+> was rebuilt for a non-technical risk operator under the installed
+> `design-taste-frontend` skill (design read: trust-first decision-support
+> surface; dials VARIANCE 4 / MOTION 5 / DENSITY 6; single locked dark
+> theme; one accent; mono numerals; zero em-dashes; reduced-motion
+> honoured throughout). Changes: plain-language vocabulary everywhere with
+> an Analyst-view toggle restoring technical terms, CIs, source paths and
+> the frozen hash one layer back; "?" popovers on every headline number;
+> a "Your economics" panel (m/a/e/c_h as business-language sliders bounded
+> by the declared ranges, plus a risk-posture control) driving live action
+> mix and cost, with the vanishing corner surfaced, not hidden, when the
+> operator sets it; a why-drawer on every decision row (risk, what the
+> system knew, three-way cost arithmetic, and the risk levels that would
+> have changed the outcome); purposeful motion (counter transitions,
+> draggable chart playhead, flowing stream with caught-first-attempt
+> emphasis, the entity timeline unfolding a case left to right with the
+> "already covered" band sweeping in). The policy endpoint consumes only
+> the frozen calibrated probabilities and clamps every input to the
+> declared grid: model, calibration, and config untouched. All invariants
+> re-verified: both systems always visible, default 100/day, max 200/day,
+> FPs and the 891 lane-1 legitimate blocks on screen, curated-episode
+> assert, nothing hardcoded, one holdout access, ground truth marked as an
+> evaluation overlay.
+
 > **Addendum (post-Stage-7 rebuild, presentation only).** The reviewer's
 > Stage 6 spec asked for a scorer *selector*; that was wrong — a selector
 > shows one system at a time while the claim is a comparison. The screen
