@@ -85,6 +85,11 @@ src/strikeone/
   route.py        two-lane routing around any scorer
   policy_engine.py cost-derived actions in declared ranges
   cli.py / rpc.py the command line and the TUI's stdio backend
+  ai/             optional narration layer, off by default: evidence
+                  contract (versioned+hashed), citation validator
+                  (fail-closed), Ollama + OpenAI-compatible adapters.
+                  The model narrates finished evidence; it never
+                  computes, routes, or touches the holdout.
 scripts/          one entry point per stage (stage0_build … stage7_run)
 reports/          STAGE_N.md per stage + committed result artifacts
   holdout_prediction.md   pre-registered ranges, analysis plan, policy

@@ -9,3 +9,6 @@ __pycache__/
 .pytest_cache/
 *.egg-info/
 models/
+
+# local AI-layer config (provider choice; never contains secrets)
+.strikeone-ai.toml

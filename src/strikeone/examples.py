@@ -31,7 +31,7 @@ IEEE_MAPPING = Mapping(
 SYNTH_MAPPING = Mapping(
     columns={"transaction_id": "txn_id", "timestamp": "ts",
              "amount": "amount", "entity": ["customer_ref"],
-             "label": "is_fraud", "score": "model_score"},
+             "label": "is_fraud", "score": "model_score", "p": "p_cal"},
     label_delay_days=7.0,
     source="synthetic (generated, labelled as such)",
 )
@@ -80,6 +80,13 @@ def synthetic(n_days: int = 45, seed: int = 7) -> pd.DataFrame:
         0.06 + 0.18 * df["is_fraud"] + 0.45 * seen_bad.astype(float)
         + 0.10 * first_strike.astype(float) + noise, 0, 1
     )
+    # a calibrated-by-construction probability for the SYNTHETIC world,
+    # so `policy` and the AI layer's /why have a p column to demonstrate
+    # with. Demo data, deterministic, labelled as such like everything here.
+    df["p_cal"] = np.clip(
+        df["model_score"] ** 2 * 0.92
+        + rng.normal(0, 0.01, len(df)), 0.001, 0.999
+    ).round(6)
     return df.drop(columns=["eidx"])
 
 

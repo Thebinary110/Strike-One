@@ -1,0 +1,16 @@
+STRIKE ONE AI  WHY THIS DECISION  (why 11254)
+──────────────────────────────────────────────────────────────────────────
+  The engine issued a BLOCK decision for this transaction. [F1]
+  The transaction was routed to lane 1 via a point-in-time blocklist. [F2]
+  The entity's episode state is already flagged. [F3]
+  The entity has 1 known prior fraud, exceeding its baseline of 0.0453. [F5]
+  The fraud probability is 0.3147, which is higher than its baseline of
+      0.0204. [F8]
+  The score percentile is 98.7311, significantly above the baseline of
+      50.0. [F9]
+  The decision results from the entity's flagged status and high fraud
+      probability relative to its history.
+
+  citations: 6 of 6 claims validated · evidence sha256:4313fe71c60f
+  narrated by: qwen3.6:35b (ollama, local) — every number above was computed
+  by the engine and re-checked against the evidence contract before printing

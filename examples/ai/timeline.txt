@@ -1,0 +1,14 @@
+STRIKE ONE AI  CASE TIMELINE  (timeline c1097)
+──────────────────────────────────────────────────────────────────────────
+  The entity experienced a quiet period of four transactions before the
+      first fraud was recorded. [T2]
+  This quiet period concluded on day 35.6363, marking the arrival of the
+      first labelled transaction. [T3]
+  The amount of this initial fraud was 35.69, which fell below the
+      quiet-period mean of 36.0775. [T4]
+  A standing blocklist would have covered zero of the fraud rows in this
+      case because it did not yet know the entity. [T6]
+
+  citations: 4 of 4 claims validated · evidence sha256:833cf9db5d71
+  narrated by: qwen3.6:35b (ollama, local) — every number above was computed
+  by the engine and re-checked against the evidence contract before printing

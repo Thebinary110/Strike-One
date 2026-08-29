@@ -1,0 +1,88 @@
+{
+  "contract_version": "1.0",
+  "evidence_hash": "4313fe71c60f4431eee8e2239e8958236f245862de706c574893086b68250f59",
+  "command": "why",
+  "transaction_id": "11254",
+  "case_id": null,
+  "decision": "BLOCK",
+  "lane": 1,
+  "fraud_probability": 0.3147,
+  "episode_state": "already flagged",
+  "evidence": [
+    {
+      "id": "F1",
+      "feature": "decision",
+      "value": "BLOCK",
+      "baseline": null,
+      "source": "lane-1 blocklist rule"
+    },
+    {
+      "id": "F2",
+      "feature": "lane",
+      "value": 1,
+      "baseline": null,
+      "source": "two-lane router (point-in-time blocklist)"
+    },
+    {
+      "id": "F3",
+      "feature": "episode_state",
+      "value": "already flagged",
+      "baseline": null,
+      "source": "episode roles, global stream"
+    },
+    {
+      "id": "F4",
+      "feature": "prior_transactions_on_entity",
+      "value": 4,
+      "baseline": 5.0,
+      "source": "point-in-time entity history (strikeone.entity)"
+    },
+    {
+      "id": "F5",
+      "feature": "knowable_prior_frauds_on_entity",
+      "value": 1,
+      "baseline": 0.0453,
+      "source": "labels at least 7 days old at decision time"
+    },
+    {
+      "id": "F6",
+      "feature": "amount",
+      "value": 5.42,
+      "baseline": 36.48,
+      "source": "amount column vs population median"
+    },
+    {
+      "id": "F7",
+      "feature": "entity_prior_mean_amount",
+      "value": 57.3575,
+      "baseline": null,
+      "source": "mean amount of this entity's earlier rows"
+    },
+    {
+      "id": "F8",
+      "feature": "fraud_probability",
+      "value": 0.3147,
+      "baseline": 0.0204,
+      "source": "calibrated p column (baseline: its mean)"
+    },
+    {
+      "id": "F9",
+      "feature": "score_percentile",
+      "value": 98.7311,
+      "baseline": 50.0,
+      "source": "rank of the score column within this file"
+    }
+  ],
+  "policy": {
+    "approve": 19634,
+    "step_up": 11692,
+    "block": 513,
+    "params": {
+      "m": 0.15,
+      "a": 0.125,
+      "e": 0.775,
+      "c_h": 30.0,
+      "s": 0.0
+    }
+  }
+}

@@ -7,7 +7,7 @@ episode-aware evaluation that selected it. Swap in your own scorer.**
 
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB)
 ![License](https://img.shields.io/badge/license-Apache--2.0-green)
-![Tests](https://img.shields.io/badge/tests-58%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-65%20passing-brightgreen)
 ![Offline](https://img.shields.io/badge/network%20calls-zero-black)
 
 </div>
@@ -217,6 +217,82 @@ strikeone tui --example ieee-cis
 
 Six panels (CONNECT, AUDIT, ROUTE, ECONOMICS, STREAM, CASE), fully
 keyboard-driven, runs offline over stdio to the local Python core.
+
+## The AI layer (optional, off by default)
+
+Narration, not intelligence: the engine makes every decision and computes
+every number; a language model only turns finished evidence into
+sentences, and **every claim it makes is re-checked against that evidence
+before printing** (fail closed — a wrong number is dropped, not printed).
+With no provider configured, nothing changes anywhere.
+
+```bash
+strikeone ai why 11254      --example synthetic   # explain one decision
+strikeone ai timeline c1097 --example synthetic   # narrate one case
+strikeone ai compare 21349  --example synthetic   # two systems, one txn
+```
+
+What `why` prints, verbatim (local model, nothing installed for the
+judge — this exact output is committed under [`examples/ai/`](examples/ai/)):
+
+```text
+STRIKE ONE AI  WHY THIS DECISION  (why 11254)
+──────────────────────────────────────────────────────────────────────────
+  The engine issued a BLOCK decision for this transaction. [F1]
+  The transaction was routed to lane 1 via a point-in-time blocklist. [F2]
+  The entity's episode state is already flagged. [F3]
+  The entity has 1 known prior fraud, exceeding its baseline of 0.0453. [F5]
+  The fraud probability is 0.3147, which is higher than its baseline of
+      0.0204. [F8]
+  The score percentile is 98.7311, significantly above the baseline of
+      50.0. [F9]
+  The decision results from the entity's flagged status and high fraud
+      probability relative to its history.
+
+  citations: 6 of 6 claims validated · evidence sha256:4313fe71c60f
+  narrated by: qwen3.6:35b (ollama, local) — every number above was computed
+  by the engine and re-checked against the evidence contract before printing
+```
+
+How it stays honest:
+
+- **The evidence contract.** Before any model speaks, the engine emits a
+  versioned, hashed JSON document (`--show-evidence` prints it) with the
+  decision, lane, episode state and named evidence values. The model
+  receives exactly this and nothing else — never raw transaction rows,
+  never holdout data (asserted by test).
+- **The citation validator.** The model must emit structured
+  `CLAIM: <id> | <value> | <sentence>` lines. Each cited value is
+  re-read from the contract; a mismatch, an unknown id, or any number
+  the contract does not vouch for drops the line. Every output reports
+  its validity rate and the evidence hash it narrates.
+- **Deterministic routing.** `why`/`timeline`/`compare` map to evidence
+  builders in a plain dict; the model never chooses a tool. There is
+  deliberately no `/challenge`, `/investigate` or `/simulate` — a model
+  second-guessing a deterministic decision is an unmeasured second fraud
+  model, and this repo does not ship one.
+
+Providers — one interface, two adapters:
+
+| provider | config | evidence path |
+|---|---|---|
+| Ollama (default suggestion) | `strikeone ai setup --provider ollama --model <name>` | never leaves the machine |
+| any OpenAI-compatible endpoint (OpenAI, OpenRouter, Ollama Cloud, custom) | `--provider openai-compatible --base-url <url> --model <slug> --api-key-env <NAME>` | this machine → endpoint (→ the routed provider, if an aggregator) |
+
+Credentials are **env vars only** — the config stores the variable's
+NAME, a test asserts no writer can persist a value from any `*KEY*` /
+`*TOKEN*` env var, and `strikeone ai setup` never prompts for a secret
+(a masked prompt still lands in scrollback and recordings).
+`strikeone ai provider` prints the full chain, including the two-party
+path through an aggregator. On OpenRouter specifically: its account
+settings control which underlying providers may retain or train on
+requests, but its own logging practices are separate from the
+providers' — check their privacy-and-logging docs for your account
+before sending anything sensitive.
+
+The LLM never computes or alters risk, selects thresholds, chooses
+actions, touches the holdout, modifies any metric, or produces any
+number reported in this repo's results.
 
 ## How it works
 

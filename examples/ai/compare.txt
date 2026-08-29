@@ -1,0 +1,18 @@
+STRIKE ONE AI  TWO SYSTEMS, ONE TRANSACTION  (compare 21349)
+──────────────────────────────────────────────────────────────────────────
+  The two-lane system issued an alert because the blocklist lane processed
+      the transaction first. [C6]
+  The blocklist state was not flagged, so the transaction proceeded to the
+      second lane. [C1]
+  The single-lane scorer did not alert because the score of 0.1711 was
+      below the cutoff of 0.1753. [C5]
+  The divergence occurred because the blocklist lane freed capacity,
+      lowering the cutoff for the remaining candidates. [C7]
+  The score ranked at the 84.9241 percentile within the file. [C3]
+  The review budget cutoff score was 0.1753 for the single-lane system. [C4]
+  The two systems diverged because the blocklist lane's processing altered
+      the scoring threshold for the second lane.
+
+  citations: 6 of 6 claims validated · evidence sha256:4a6b27b52ded
+  narrated by: qwen3.6:35b (ollama, local) — every number above was computed
+  by the engine and re-checked against the evidence contract before printing

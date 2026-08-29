@@ -1,0 +1,63 @@
+{
+  "contract_version": "1.0",
+  "evidence_hash": "4a6b27b52dedfdf35afc73ad2c9c0f79dc9c911957d9aff73e097532a017f265",
+  "command": "compare",
+  "transaction_id": "21349",
+  "case_id": null,
+  "decision": "alert",
+  "lane": 2,
+  "fraud_probability": null,
+  "episode_state": "first attempt",
+  "evidence": [
+    {
+      "id": "C1",
+      "feature": "blocklist_state",
+      "value": "not flagged",
+      "baseline": null,
+      "source": "point-in-time blocklist, 7-day label delay"
+    },
+    {
+      "id": "C2",
+      "feature": "score",
+      "value": 0.1711,
+      "baseline": 0.0873,
+      "source": "score column (baseline: its mean)"
+    },
+    {
+      "id": "C3",
+      "feature": "score_percentile",
+      "value": 84.9241,
+      "baseline": 50.0,
+      "source": "rank of the score within this file"
+    },
+    {
+      "id": "C4",
+      "feature": "review_budget_cutoff_score",
+      "value": 0.1753,
+      "baseline": null,
+      "source": "top-4,500 alerts at 100/day over 45.0 days"
+    },
+    {
+      "id": "C5",
+      "feature": "single_lane_scorer_verdict",
+      "value": "no alert",
+      "baseline": null,
+      "source": "score ranking alone, same budget"
+    },
+    {
+      "id": "C6",
+      "feature": "two_lane_system_verdict",
+      "value": "alert",
+      "baseline": null,
+      "source": "blocklist lane first, scorer on the rest"
+    },
+    {
+      "id": "C7",
+      "feature": "divergence_mechanism",
+      "value": "routing freed capacity: the same review budget spread over fewer lane-2 candidates lowers the cutoff below this score",
+      "baseline": null,
+      "source": "deterministic comparison of the two alert sets"
+    }
+  ],
+  "policy": null
+}

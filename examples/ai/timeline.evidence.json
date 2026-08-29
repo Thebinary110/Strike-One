@@ -1,0 +1,63 @@
+{
+  "contract_version": "1.0",
+  "evidence_hash": "833cf9db5d71b6233fbadaaa6a45c73dfe7c862a7f36a63a4a20711026b35d04",
+  "command": "timeline",
+  "transaction_id": null,
+  "case_id": "c1097",
+  "decision": null,
+  "lane": null,
+  "fraud_probability": null,
+  "episode_state": "already flagged",
+  "evidence": [
+    {
+      "id": "T1",
+      "feature": "case_transactions",
+      "value": 7,
+      "baseline": null,
+      "source": "all rows for this entity"
+    },
+    {
+      "id": "T2",
+      "feature": "quiet_transactions_before_first_fraud",
+      "value": 4,
+      "baseline": null,
+      "source": "rows before the case's first labelled transaction"
+    },
+    {
+      "id": "T3",
+      "feature": "first_fraud_day_index",
+      "value": 35.6363,
+      "baseline": null,
+      "source": "days since the start of this file"
+    },
+    {
+      "id": "T4",
+      "feature": "first_fraud_amount",
+      "value": 35.69,
+      "baseline": 36.0775,
+      "source": "amount vs the case's own quiet-period mean"
+    },
+    {
+      "id": "T5",
+      "feature": "labelled_frauds_in_case",
+      "value": 3,
+      "baseline": null,
+      "source": "label column over the case"
+    },
+    {
+      "id": "T6",
+      "feature": "blocklist_coverable_in_case",
+      "value": 0,
+      "baseline": null,
+      "source": "fraud rows where a 7-day-delayed blocklist already knew this entity"
+    },
+    {
+      "id": "T7",
+      "feature": "case_fraud_amount_total",
+      "value": 62.96,
+      "baseline": null,
+      "source": "sum of labelled-fraud amounts"
+    }
+  ],
+  "policy": null
+}

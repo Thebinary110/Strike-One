@@ -175,6 +175,81 @@ def cmd_tui(args) -> int:
                             *args.rest], env=env, cwd=str(tui_dir))
 
 
+def cmd_ai(args) -> int:
+    """AI narration layer. Disabled by default; deterministic commands
+    never import this. The model never chooses a tool: argparse is the
+    intent parser and evidence.BUILDERS is the router."""
+    from strikeone.ai import aiconfig, commands, evidence
+
+    if args.ai_cmd == "setup":
+        detected = aiconfig.detect_env()
+        if detected:
+            print("credential env vars detected (values never shown, never "
+                  "stored): " + ", ".join(detected))
+        else:
+            print("no credential env vars detected (OPENAI_API_KEY / "
+                  "OPENROUTER_API_KEY). For a remote provider, export one "
+                  "first; strikeone never prompts for secrets.")
+        if not args.provider:
+            print("configure with, e.g.:\n"
+                  "  strikeone ai setup --provider ollama --model qwen3:8b\n"
+                  "  strikeone ai setup --provider openai-compatible \\\n"
+                  "    --base-url https://openrouter.ai/api/v1 \\\n"
+                  "    --model openai/gpt-4o-mini "
+                  "--api-key-env OPENROUTER_API_KEY")
+            return 0
+        cfg = aiconfig.AIConfig(provider=args.provider, model=args.model or "",
+                                base_url=args.base_url or "",
+                                api_key_env=args.api_key_env
+                                or "OPENAI_API_KEY",
+                                think=args.think or "")
+        cfg.save(args.ai_config)
+        print(f"written to {args.ai_config} (no secrets: it stores the env "
+              "var's name, not its value)")
+        return 0
+
+    cfg = aiconfig.AIConfig.load(args.ai_config)
+
+    if args.ai_cmd == "provider":
+        if cfg is None:
+            print("AI: disabled (the default). No provider configured; "
+                  "every deterministic command runs exactly as always.\n"
+                  "Enable with: strikeone ai setup")
+            return 0
+        print(cfg.build().chain_text())
+        return 0
+
+    df, m = _load(args)
+    if args.show_evidence:
+        builder = evidence.BUILDERS[args.ai_cmd]
+        kw = {"capacity_per_day": int(args.capacity)} \
+            if args.ai_cmd == "compare" else {}
+        print(json.dumps(builder(df, m, args.target, **kw), indent=2))
+        return 0
+    if cfg is None:
+        print("strikeone ai: disabled by default and no provider is "
+              "configured.\nRun `strikeone ai setup`, or use "
+              "--show-evidence to print the deterministic evidence "
+              "contract with no model at all.", file=sys.stderr)
+        return 2
+    res = commands.run(args.ai_cmd, df, m, args.target, cfg.build(),
+                       capacity_per_day=int(args.capacity))
+    if args.json:
+        v = res["validated"]
+        print(json.dumps({
+            "contract": res["contract"], "model": res["model"],
+            "provider": res["provider"], "validity": res["validity"],
+            "lines": v.lines, "dropped": v.dropped}, indent=2))
+    else:
+        title = {"why": "WHY THIS DECISION", "timeline": "CASE TIMELINE",
+                 "compare": "TWO SYSTEMS, ONE TRANSACTION"}[args.ai_cmd]
+        print(f"STRIKE ONE AI  {title}  "
+              f"({args.ai_cmd} {args.target})")
+        print("─" * 74)
+        print(res["rendered"])
+    return 0
+
+
 def main(argv=None) -> None:
     argv = list(sys.argv[1:] if argv is None else argv)
     # `tui` forwards everything (incl. --help) to the node app untouched
@@ -239,6 +314,50 @@ def main(argv=None) -> None:
 
     sub.add_parser("tui", help="terminal UI (Ink; needs Node 18+); "
                                "strikeone tui --help for keys and usage")
+
+    pai = sub.add_parser("ai", help="AI narration of already-made decisions "
+                                    "(disabled by default; every claim is "
+                                    "validated against engine evidence)")
+    sai = pai.add_subparsers(dest="ai_cmd", required=True)
+    for name, doc, needs_target in [
+        ("why", "explain one already-made decision, with cited evidence",
+         True),
+        ("timeline", "narrate one case: quiet purchases, the first "
+                     "labelled transaction, the covered run after it", True),
+        ("compare", "the two systems on one transaction, and why they "
+                    "diverged", True),
+        ("provider", "show the provider chain and where evidence goes",
+         False),
+        ("setup", "detect credentials (env vars only) and write the AI "
+                  "config; never prompts for a secret", False),
+    ]:
+        q = sai.add_parser(name, help=doc)
+        q.set_defaults(fn=cmd_ai)
+        q.add_argument("--ai-config", default=".strikeone-ai.toml",
+                       help="AI config file (default .strikeone-ai.toml)")
+        if needs_target:
+            q.add_argument("target",
+                           help="transaction id (why/compare) or "
+                                "case/entity id (timeline)")
+            _add_source_args(q)
+            q.add_argument("--capacity", type=float, default=100,
+                           help="reviews/day for the compare budget "
+                                "(default: the stated 100)")
+            q.add_argument("--show-evidence", action="store_true",
+                           help="print the deterministic evidence contract "
+                                "and exit (no model, no provider)")
+        if name == "setup":
+            q.add_argument("--provider",
+                           choices=["ollama", "openai-compatible"])
+            q.add_argument("--model")
+            q.add_argument("--base-url")
+            q.add_argument("--api-key-env",
+                           help="NAME of the env var holding the key "
+                                "(default OPENAI_API_KEY); the value is "
+                                "never read at setup time, never stored")
+            q.add_argument("--think", choices=["on", "off"],
+                           help="ollama hybrid-reasoning models: off skips "
+                                "the thinking pass (narration needs none)")
 
     args = ap.parse_args(argv)
     try:
