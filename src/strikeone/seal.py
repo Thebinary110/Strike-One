@@ -57,8 +57,9 @@ def load_holdout(unseal: bool = False, reason: str = "") -> pd.DataFrame:
     """The single sanctioned reader of the holdout file."""
     if not unseal:
         raise SealedHoldoutError(
-            "The holdout is sealed. It is opened exactly once, at Stage 7, "
-            "by passing unseal=True (--unseal) with a stated reason. "
+            "The holdout is sealed. It is opened only against a "
+            "pre-registered plan, by passing unseal=True (--unseal) "
+            "with a stated reason. "
             "Every access is logged to reports/holdout_access.log."
         )
     if not reason.strip():

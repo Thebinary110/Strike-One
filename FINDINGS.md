@@ -16,7 +16,8 @@ nothing; adding the entity-history features everyone adds buys +0.17 AP
 while *reducing* first-strike recall with a confidence interval that
 excludes zero. Every piece is measured under a chronological protocol,
 paired-tested, key-sensitivity-checked — and re-confirmed on a sealed
-out-of-time holdout opened exactly once against a pre-registered plan.
+out-of-time holdout whose every access (two, both against plans
+committed beforehand) is logged.
 
 Two further named results. **Money is not an escape hatch:** realized
 cost computed on propagated labels *is* amount-weighted AP — a team that
@@ -28,7 +29,9 @@ optimum, decisive under the capacity constraints every real risk team
 operates under. **Routing inoculation:** an explicit blocklist lane lifts
 the headline model's own tight-budget first-strike recall 0.079 → 0.246
 (3.1× on validation; 2.32× on the holdout, as pre-registered) without
-touching the model — the architecture protects any scorer.
+touching the model. The lane is scorer-agnostic by construction; the lift
+itself is measured per scorer, and the tool reports it honestly when a
+lane adds nothing.
 
 And the yardstick chose the better *system*, not just the better score:
 because the corrected metric selected a scorer with **no entity
@@ -64,11 +67,14 @@ hypothesis, above).
 The official `test.csv` labels were never released, so we carve a
 chronological holdout (days 151–182) from the training file, seal it in
 code (SHA-256 pinned, loadable only through an access-logged unseal call),
-and open it **exactly once**, at the end, against a pre-registered
-analysis plan. `reports/holdout_access.log` contains **exactly one
-entry** — timestamped, hash-verified, with the pre-registration commit in
-its stated reason. A clean-clone rebuild reproduces the sealed file
-byte-identically.
+and open it only against pre-registered analysis plans committed before
+each unsealing. `reports/holdout_access.log` contains **exactly two
+entries** — timestamped, hash-verified, each with its pre-registration
+commit in the stated reason: the Stage-7 final evaluation (188b471) and
+a second access for baselines and robustness checks (67d35f7,
+`reports/stage8/SECOND_ACCESS.md`) that could not change the frozen
+system, only report on it. A clean-clone rebuild reproduces the sealed
+file byte-identically.
 
 ## Bugs our own checks caught
 
@@ -117,14 +123,30 @@ operating points), and the two-number reporting policy were committed
 
 Full scorecard and discussion: `reports/STAGE_7.md`.
 
+A **second access** (baselines and robustness checks, pre-registered at
+67d35f7) has its own scorecard: no-reversal and random-floor predictions
+hit; two magnitude predictions missed — one against us (rank-by-amount is
+a far stronger loss-weighted baseline than we called, see Results), one
+for us (the rebuilt cost edge exceeded its predicted band). Full details:
+`reports/stage8/SECOND_ACCESS.md`.
+
 ## Assumption ranges, and the remaining caveats
 
 - **Every economic figure is an assumption range, not a fact.** We are
   not Razorpay and do not know their economics. Cost parameters are
   declared ranges (m ∈ [0.05, 0.25], a ∈ [0.05, 0.20], e ∈ [0.60, 0.95],
-  c_h ∈ [15, 60] amount-units) with a published 81-corner sensitivity
-  grid and its vanishing corner named. No single rupee figure is stated
-  as fact anywhere.
+  c_h ∈ [15, 60] amount-units, liability shift s ∈ [0, 1], default 0)
+  with a published sensitivity grid and its weakest corner named. The
+  cost policy's edge over a fixed threshold was rebuilt out-of-sample
+  after review (the original same-data "81/81" was withdrawn as
+  near-tautological — Cawley & Talbot, JMLR 2010): validation-tuned
+  threshold vs validation-fitted policy, both scored on the sealed
+  holdout, per-corner bootstrap CIs — **81 of 81 corners, median edge
+  +14.4% of approve-all cost, IQR [+9.3%, +20.5%], weakest corner
+  +3.4%**, under the stated counterfactual assumption (a blocked fraud
+  is fully avoided; a stepped-up one avoided with probability e — the
+  e and s grid dimensions are that assumption's sensitivity). No single
+  rupee figure is stated as fact anywhere.
 - **The entity key is a proxy** for the host's true propagation key;
   episode results are reported under alternate keys with the sensitivity
   quantified (the core claim is key-robust; one secondary claim is
@@ -136,7 +158,7 @@ Full scorecard and discussion: `reports/STAGE_7.md`.
   mature over ~30–120 days), so every label-derived-feature gain we
   report is an upper bound on its production value.
 
-## Results — the holdout, opened once
+## Results — the holdout
 
 Primary = the frozen day-112 pipeline; secondary = the same recipe refit
 through day 147 with nested calibration (never on the holdout). Holdout:
@@ -169,6 +191,27 @@ worse at prevention. Retraining cadence is worth **+0.068 AP**
 (primary → secondary). The replay tooling reproduces every counter from
 `holdout_replay.parquet` — the same swapped-parquet path proven in
 Stage 6.
+
+**Baselines nobody can skip (second access).** At the same 3,200 alerts:
+a random ranker sits at the budget share on everything (~3–4%). A
+**rank-by-amount sort — no model — reaches 0.3447 loss-weighted
+first-hit recall, 73% of the shipped system's 0.4733.** We predicted
+0.05–0.20 and a ≥2× margin; that prediction missed, and per the
+pre-registration the finding is reported here, not buried: on this data,
+if loss-weighted coverage were the only objective and ~95% false
+positives were tolerable, sorting by amount gets most of the way. The
+shipped system stays ahead at every budget (1.26–1.83×) and wins where
+the ranking has to be *usable*: rank-by-amount catches 5.3% of cases
+first-hit at 5.5% precision (3,023 flagged good customers) vs the
+shipped 58.3% at 45.7%. `reports/stage8/baselines_kcurve.csv`.
+
+**The conclusion survives slower labels (second access).** Rebuilding
+the evaluation-side blocklist at 1/3/7/14/30-day maturity: the shipped
+system's first-hit-recall edge over single-lane B stays positive with
+CIs excluding zero at every delay — +0.0543 at 1 day, **+0.0434 at 30
+days**. No reversal; no boundary to name. (Scope limit: B's
+label-derived features remain trained at 7 days; a fully consistent
+sweep would retrain per delay.) `reports/stage8/maturity_sweep.csv`.
 
 ## Why no graph model
 
@@ -208,6 +251,9 @@ uv run python scripts/stage6_prepare_replay.py    # worked-example replay file
 # Stage 7 (already executed once; the run script refuses a second unseal):
 #   uv run python scripts/stage7_prepare.py
 #   uv run python scripts/stage7_run.py
+# Second pre-registered access (already executed; refuses to re-run —
+# it asserts the log holds exactly one entry before, two after):
+#   uv run python scripts/stage8_access2.py
 ```
 
 All randomness is seeded (`strikeone.config.SEED`). Runs on a laptop CPU;

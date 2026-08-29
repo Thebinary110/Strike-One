@@ -189,11 +189,11 @@ class AuditResult:
                 sp = bl["scorer_precision_same_n"]
                 L.append(f"  by flagging {nb:,} transactions at "
                          f"{bl['precision']:.1%} precision, with "
-                         + r("0") + " first-hit counts.")
+                         + r("0") + " first-hit catches.")
                 L.append(f"  At the same {nb:,} alerts your scorer reaches "
-                         f"{sp:.1%} precision and stops")
+                         f"{sp:.1%} precision and catches")
                 L.append(f"  {bl['scorer_fs_catches_same_n']:,} cases "
-                         "first-hit. "
+                         "at the first hit. "
                          + ("The blocklist is still more precise there:"
                             if bl["precision"] > sp else
                             "Respectable precision, zero first hits:")

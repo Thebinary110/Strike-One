@@ -38,7 +38,7 @@ SPLIT_DAYS = {
     "delay_gap": (113, 119),  # matches the 7-day label-availability delay
     "val": (120, 147),        # tuning, calibration, threshold derivation
     "blind_gap": (148, 150),  # stops timedelta features bridging the boundary
-    "holdout": (151, 182),    # opened once, at Stage 7
+    "holdout": (151, 182),    # every access pre-registered and logged
 }
 
 # Label-derived features must be lagged by this many days (labels are not

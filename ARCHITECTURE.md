@@ -1,6 +1,16 @@
 # Architecture
 
-## The shipped system (frozen at Stage 4, config hash `b632a136…`)
+Strike One ships two things: a **bring-your-own-scorer evaluation
+package** (`strikeone` — audit / route / policy / check / tui), and the
+**reference detector** that package's corrected evaluation selected on
+IEEE-CIS, frozen before the sealed holdout was opened. The reference
+detector is the measured subject of the study, not a model to deploy on
+your traffic; the package is the part meant to run on yours. (An earlier
+video walkthrough referenced here was removed from the repo; `FINDINGS.md`
+is the narrative now.) The cost ranges below include the liability-shift
+parameter `s` (default 0, freeze-preserving).
+
+## The reference detector (frozen at Stage 4, config hash `b632a136…`)
 
 ```
 incoming transaction
@@ -27,7 +37,7 @@ incoming transaction
         │
         ▼
   3-action expected-cost argmin over {approve, step-up, block}
-  with declared cost ranges m/a/e/c_h                    ~µs
+  with declared cost ranges m/a/e/c_h/s                    ~µs
         │
         ▼
   decision object: p, lane, entity state, action, cost arithmetic
@@ -44,8 +54,9 @@ outside the argmin.
   only, never calendar dates.
 - **Sealed holdout**: own parquet, SHA-256 committed, loadable only via
   `strikeone.seal.load_holdout(unseal=True, reason=…)`, every access
-  appended to a committed log. Opened exactly once, at Stage 7, against a
-  pre-registered analysis plan.
+  appended to a committed log. Two accesses, each against a
+  pre-registered plan committed beforehand (Stage 7; then baselines and
+  robustness checks, `reports/stage8/`).
 - **Point-in-time features** (`strikeone/entity.py`): expanding/windowed
   aggregates over strictly-prior rows; label-derived features additionally
   lagged by the 7-day verification delay. Unit-tested against
@@ -77,7 +88,7 @@ src/strikeone/
 scripts/          one entry point per stage (stage0_build … stage7_run)
 reports/          STAGE_N.md per stage + committed result artifacts
   holdout_prediction.md   pre-registered ranges, analysis plan, policy
-  holdout_access.log      committed; exactly one entry after Stage 7
+  holdout_access.log      committed; exactly two entries, both pre-registered
 PROPOSALS.md      every judgment call outside the brief, with status
 ```
 

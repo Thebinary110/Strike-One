@@ -9,6 +9,20 @@
 > transaction". This report keeps its original wording; rewriting history
 > silently would undercut the integrity story it documents.
 
+> **Cost-claim revision (2026-08-30).** The "81/81 corners" comparison
+> below was computed on the same validation slice used both to tune the
+> fixed-threshold comparator and to judge it — and fixed thresholds are a
+> nested special case of cost policies, so unanimity there was close to
+> tautological (Cawley & Talbot, JMLR 2010). That phrasing is withdrawn.
+> The claim was rebuilt out-of-sample in the second pre-registered
+> holdout access: validation-fitted policy vs per-corner validation-tuned
+> fixed threshold, both evaluated on the sealed holdout, per-corner
+> bootstrap CIs. Rebuilt result: 81 of 81 corners with CIs excluding
+> zero, median edge +14.4% of approve-all cost (IQR +9.3/+20.5%, weakest
+> corner +3.4%), with the counterfactual assumption stated alongside.
+> See `reports/stage8/SECOND_ACCESS.md`. This report keeps its original
+> wording.
+
 ## Surprises first
 
 1. **The budget-matched check (verification 1) retired our best sentence.**
