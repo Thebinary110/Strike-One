@@ -1,0 +1,34 @@
+Provider-independence harness — recorded run (2026-08-30)
+
+One fixed evidence contract (synthetic example, `ai why`, txn 11254)
+narrated by six models via one OpenRouter key plus local Ollama; every
+claim re-validated by the citation validator (fail closed).
+
+  citation validity: 100% of 40 claims across 6 models from 6 families
+
+  minimax/minimax-m3:free                  7/7
+  nvidia/nemotron-3-super-120b-a12b:free   6/6
+  poolside/laguna-s-2.1:free               7/7
+  cohere/north-mini-code:free              6/6
+  inclusionai/ling-3.0-flash-fin:free      8/8
+  qwen3.6:35b (local ollama)               6/6
+
+Notes, so this is reproducible and honest:
+- The key used was zero-credit free tier, so the run used OpenRouter's
+  ':free' routes (shared capacity; availability varies by the minute —
+  google and z-ai free routes were 429 upstream at run time). The
+  committed default pins in tests/test_ai.py are paid slugs; a free-tier
+  key overrides them via STRIKEONE_INDEPENDENCE_SLUGS, exactly as this
+  run did. STRIKEONE_OLLAMA_MODEL added the local model.
+- The test requires OPENROUTER_API_KEY in the environment and skips
+  cleanly without it; a clean clone passes with no key and no Ollama.
+- 100% validity means every structured claim these models emitted
+  matched the evidence. Lines a model wastes (unstructured text,
+  digit-bearing summaries) are dropped and would show here as
+  valid < total; none of these six lost a claim.
+
+Reproduce:
+  OPENROUTER_API_KEY=... \
+  STRIKEONE_INDEPENDENCE_SLUGS="<comma-separated slugs>" \
+  STRIKEONE_OLLAMA_MODEL="<local model>" \
+  uv run pytest tests/test_ai.py -k independence -s

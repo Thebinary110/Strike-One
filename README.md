@@ -271,6 +271,13 @@ How it stays honest:
   deliberately no `/challenge`, `/investigate` or `/simulate` — a model
   second-guessing a deterministic decision is an unmeasured second fraud
   model, and this repo does not ship one.
+- **Provider independence is a test, not a demo.** A pytest harness runs
+  one fixed evidence contract through pinned model slugs via a single
+  OpenRouter key plus local Ollama and asserts the validator passes for
+  every one. Recorded run: **citation validity 100% of 40 claims across
+  6 models from 6 families**
+  ([`examples/ai/independence_run.txt`](examples/ai/independence_run.txt)).
+  It needs `OPENROUTER_API_KEY` and skips cleanly without it.
 
 Providers — one interface, two adapters:
 

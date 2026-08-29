@@ -209,30 +209,57 @@ def test_ai_disabled_by_default_and_audit_unchanged(tmp_path, monkeypatch, capsy
 
 PINNED_SLUGS = [
     "openai/gpt-4o-mini",
-    "anthropic/claude-3.5-haiku",
+    "anthropic/claude-haiku-4.5",
     "meta-llama/llama-3.1-8b-instruct",
-    "google/gemini-2.0-flash-001",
+    "google/gemini-2.5-flash",
 ]
+# A zero-credit (free-tier) key cannot reach the paid pins; override the
+# slug list without editing the test via
+#   STRIKEONE_INDEPENDENCE_SLUGS="a/x:free,b/y:free" pytest -k independence
+# STRIKEONE_OLLAMA_MODEL adds a local Ollama model to the same harness.
+
+
+def _ollama_reachable(base="http://localhost:11434") -> bool:
+    import urllib.request
+    try:
+        urllib.request.urlopen(f"{base}/api/tags", timeout=2)
+        return True
+    except Exception:
+        return False
 
 
 @pytest.mark.skipif(not os.environ.get("OPENROUTER_API_KEY"),
                     reason="provider-independence harness needs "
                            "OPENROUTER_API_KEY; skipping cleanly")
 def test_provider_independence_citation_validity(synth):
-    """One fixed evidence set through several model families; the citation
-    validator must pass for every one. A measured claim, not a demo."""
-    from strikeone.ai.providers import OpenAICompatibleProvider
+    """One fixed evidence set through several model families (plus local
+    Ollama when present); the citation validator must pass for every one.
+    A measured claim, not a demo."""
+    from strikeone.ai.providers import (OllamaProvider,
+                                        OpenAICompatibleProvider)
     df, m = synth
     txn = _some_fraud_txn(df)
+    override = os.environ.get("STRIKEONE_INDEPENDENCE_SLUGS", "")
+    slugs = [s.strip() for s in override.split(",") if s.strip()] \
+        or PINNED_SLUGS
+    providers = [(slug, OpenAICompatibleProvider(
+        model=slug, base_url="https://openrouter.ai/api/v1",
+        api_key_env="OPENROUTER_API_KEY")) for slug in slugs]
+    local = os.environ.get("STRIKEONE_OLLAMA_MODEL")
+    if local and _ollama_reachable():
+        providers.append((f"{local} (local ollama)",
+                          OllamaProvider(model=local, think=False)))
     results = {}
-    for slug in PINNED_SLUGS:
-        p = OpenAICompatibleProvider(
-            model=slug, base_url="https://openrouter.ai/api/v1",
-            api_key_env="OPENROUTER_API_KEY")
+    for name, p in providers:
         res = commands.run("why", df, m, txn, p)
         v = res["validated"]
-        results[slug] = (v.valid_claims, v.total_claims, res["model"])
-        assert v.total_claims >= 3, f"{slug}: too few structured claims"
+        results[name] = (v.valid_claims, v.total_claims, res["model"])
+        assert v.total_claims >= 3, f"{name}: too few structured claims"
         assert v.valid_claims == v.total_claims, \
-            f"{slug}: {v.validity}, dropped={v.dropped}"
-    print("citation validity per pinned model:", results)
+            f"{name}: {v.validity}, dropped={v.dropped}"
+    n = sum(r[1] for r in results.values())
+    fams = {name.split("/")[0] for name in results}
+    print(f"\ncitation validity: 100% of {n} claims across "
+          f"{len(results)} models from {len(fams)} families")
+    for name, (vc, tc, answered) in results.items():
+        print(f"  {name}: {vc}/{tc} (answered by {answered})")
