@@ -356,6 +356,20 @@ def make_handler(replay: Replay):
                     self.send_header("Content-Length", str(len(body)))
                     self.end_headers()
                     self.wfile.write(body)
+                elif u.path.startswith("/fonts/"):
+                    f = (STATIC / "fonts" / Path(u.path).name).resolve()
+                    if f.parent != (STATIC / "fonts").resolve() or not f.exists():
+                        self._json({"error": "not found"}, 404)
+                        return
+                    body = f.read_bytes()
+                    ctype = ("font/woff2" if f.suffix == ".woff2"
+                             else "text/plain; charset=utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", ctype)
+                    self.send_header("Cache-Control", "max-age=86400")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
                 elif u.path == "/api/meta":
                     self._json(replay.meta())
                 elif u.path == "/api/counters":

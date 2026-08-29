@@ -1,5 +1,27 @@
 # Stage 6 — The product surface
 
+> **Addendum 3 (design pass, presentation only).** Light theme shipped as
+> default (identity: ink on off-white; semantic colour on data only; hard
+> hairline rules instead of cards; asymmetric hero with the delta
+> dominant; S1 mark + Clash Display logotype). Typography self-hosted in
+> `console_static/fonts/`: Clash Display 600/700 (display and all large
+> numbers) and Satoshi 400/500/700 (body), both Fontshare families under
+> the ITF Free Font License v2.0, free for commercial use; licence files
+> committed alongside the woff2 files and served by the console. Monospace
+> now appears only in Analyst view. Story mode runs on first load (three
+> beats: same budget, converge at generous budgets, diverge at real
+> capacity), skippable, replayable from the header, skipped entirely under
+> prefers-reduced-motion. Bug fixes: timeline margins + thinned tick
+> labels + clamped annotation (no more clipped "THE FIRST ATTEMPT");
+> decision feed starts the chronological tape just before the first
+> caught first-attempt and states honestly when the mix is
+> verification-heavy; digit grouping unified to en-US with the unit stated
+> once; popovers styled with titles. A dark-mode toggle was considered and
+> skipped: doing it to the same standard is not cheap, and the page-level
+> single-theme lock (recorded in light) is the cleaner call. All
+> invariants re-verified; holdout log still one entry. Gate shots:
+> `stage6/shot1_default.png`, `shot2_economics.png`, `shot3_timeline.png`.
+
 > **Addendum 2 (operator-grade frontend, presentation only).** The console
 > was rebuilt for a non-technical risk operator under the installed
 > `design-taste-frontend` skill (design read: trust-first decision-support
