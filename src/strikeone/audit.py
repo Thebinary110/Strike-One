@@ -91,9 +91,9 @@ class AuditResult:
             if s.get("capacity_stated"):
                 L.append(f"  at your stated {pr['per_day']:,} reviews/day:")
             else:
-                L.append(f"  at {pr['per_day']:,} reviews/day, inferred from "
-                         "your fraud volume")
-                L.append("  (pass --capacity to use your real number):")
+                L.append(f"  at a stated default of {pr['per_day']:,} "
+                         "reviews/day")
+                L.append("  (pass --capacity with your real number):")
             L.append(f"  {pr['headline_recall']:.0%} of fraud transactions "
                      "caught, "
                      + r(f"{pr['false_positives']:,} good customers flagged"))
@@ -109,42 +109,61 @@ class AuditResult:
                      "catches for free.")
             L.append("")
 
-            # d) the gap, one plain sentence, their numbers
-            L.append(b("THE GAP, IN YOUR NUMBERS"))
-            for line in _wrap(self.sentence, W - 2):
-                L.append("  " + line)
+            # d) where the budget went: the honest single-system framing
+            L.append(b("WHERE YOUR ALERTS WENT"))
+            L.append(f"  of {pr['budget']:,} alerts spent:")
+            L.append("  " + g(f"{pr['fs_catches']:>6,}") + "  stopped a fraud "
+                     "case at its first attempt: the only alerts")
+            L.append("          that prevented a loss")
+            L.append("  " + a(f"{pr['redundant']:>6,}") + "  were later "
+                     "attempts in cases that had already begun")
+            L.append(f"          ({pr['redundancy_rate']:.0%} of your correct "
+                     "alerts); a blocklist catches these")
+            L.append("          for free")
+            L.append("  " + r(f"{pr['false_positives']:>6,}") + "  flagged "
+                     "good customers")
             L.append("")
 
-            # e) redundancy + blocklist-recoverable share
+            # e) blocklist share + a BUDGET-MATCHED comparison, always
             L.append(b("WHAT A BLOCKLIST GETS YOU FOR FREE"))
             L.append("  a plain blocklist, no model, recovers "
                      + a(f"{bl['recovered_share']:.1%}")
                      + " of your labelled fraud")
-            comp = bl["precision_vs_scorer"]
-            L.append(f"  at {bl['precision']:.1%} precision, while stopping "
-                     + r("0") + " cases on the first attempt.")
-            if comp is not None:
-                L.append("  That precision is "
-                         + (f"{comp:.0%} of" if comp < 1 else "MORE than")
-                         + " your scorer's at the same capacity.")
+            if bl.get("comparison_n"):
+                nb = bl["comparison_n"]
+                sp = bl["scorer_precision_same_n"]
+                L.append(f"  by flagging {nb:,} transactions at "
+                         f"{bl['precision']:.1%} precision, with "
+                         + r("0") + " first-attempt stops.")
+                L.append(f"  At the same {nb:,} alerts your scorer reaches "
+                         f"{sp:.1%} precision and stops")
+                L.append(f"  {bl['scorer_fs_catches_same_n']:,} cases "
+                         "first-attempt. "
+                         + ("The blocklist is still more precise there;"
+                            if bl["precision"] > sp else
+                            "Respectable precision, zero prevention:")
+                         )
+                L.append("  precision without prevention is exactly what it "
+                         "sells.")
             L.append("")
 
-            # f) estimated routing lift + one concrete action
+            # f) one concrete action, derived from the SAME numbers as the
+            # wasted-on-known column above, so they can never diverge
             L.append(b("ONE THING TO DO NEXT"))
-            freed = pr["alerts_on_flagged_per_day"]
-            if freed >= 0.5:
-                L.append("  routing already-flagged entities to a blocklist "
-                         "lane would free about")
-                L.append("  " + a(f"{freed:.0f} of your {pr['per_day']:,} "
-                                  "reviews/day")
-                         + " for fraud that is actually new.")
+            wasted_pd = pr["redundant"] / max(s["days"], 1)
+            if wasted_pd >= 0.5:
+                L.append("  " + a(f"about {wasted_pd:.0f} of your "
+                                  f"{pr['per_day']:,} reviews/day")
+                         + " went to cases that had already")
+                L.append("  begun. How many of those a blocklist lane "
+                         "actually recovers depends on")
+                L.append(f"  your {s['label_delay_days']:g}-day label "
+                         "maturity. Measure it: strikeone route <your file>")
             else:
-                L.append("  at your label maturity, almost none of your "
-                         "reviews land on entities a")
-                L.append("  blocklist could already know; a routing lane "
-                         "would change little here.")
-            L.append("  Measure it on your scorer: strikeone route "
-                     "<your file>")
+                L.append("  almost none of your reviews land on cases that "
+                         "had already begun; a")
+                L.append("  routing lane would change little here. Verify: "
+                         "strikeone route <your file>")
             L.append("")
 
             # the working table, compact
@@ -217,6 +236,9 @@ def _wrap(text: str, width: int) -> list[str]:
     return lines
 
 
+DEFAULT_CAPACITY = 100  # a stated default, not an inference
+
+
 def _budget_grid(n_rows: int, days: float, positives: int,
                  capacity: float | None = None) -> tuple[list, int]:
     grid = [x for x in BUDGET_MENU if x * days <= 0.25 * n_rows]
@@ -227,8 +249,9 @@ def _budget_grid(n_rows: int, days: float, positives: int,
         if cap not in grid:
             grid = sorted(set(grid + [cap]))
         return grid, cap
-    per_day_pos = positives / max(days, 1)
-    return grid, min(grid, key=lambda x: abs(x - per_day_pos))
+    if DEFAULT_CAPACITY in grid:
+        return grid, DEFAULT_CAPACITY
+    return grid, grid[-1]
 
 
 def audit(df: pd.DataFrame, label_delay_days: float = 7.0,
@@ -279,6 +302,7 @@ def audit(df: pd.DataFrame, label_delay_days: float = 7.0,
         "entity_resolution": resolution,
         "rows_dropped": 0,
         "capacity_stated": capacity_per_day is not None,
+        "capacity_default": DEFAULT_CAPACITY,
     }
     blocklist = {
         "flagged_rows": int(flag.sum()),
@@ -305,28 +329,34 @@ def audit(df: pd.DataFrame, label_delay_days: float = 7.0,
             red = int((alert & prop).sum())
             res.budgets.append({
                 "per_day": per_day, "budget": budget,
+                "hits": on_pos, "redundant": red, "fs_catches": fs_c,
                 "headline_recall": on_pos / pos if pos else 0.0,
                 "false_positives": int(budget - on_pos),
                 "fs_recall": fs_c / n_eps if n_eps else 0.0,
                 "redundancy_rate": red / on_pos if on_pos else 0.0,
                 "friction_efficiency": fs_c / budget if budget else 0.0,
                 "precision": on_pos / budget if budget else 0.0,
-                "alerts_on_flagged_per_day":
-                    float((alert & flag).sum() / max(days, 1)),
                 "primary": per_day == primary,
             })
         pr = next(x for x in res.budgets if x["primary"])
-        if pr["precision"] > 0:
-            blocklist["precision_vs_scorer"] = (
-                blocklist["precision"] / pr["precision"])
-        n_red = int(round(pr["redundancy_rate"]
-                          * pr["headline_recall"] * pos))
+        # budget-matched comparison, ALWAYS: the scorer evaluated at the
+        # blocklist's own alert count. Never compare precisions computed
+        # at different Ns (regression-tested; this error shipped twice).
+        n_bl = int(flag.sum())
+        if n_bl > 0:
+            al_bl = M.alerts_at_budget(s, n_bl)
+            hits_bl = int((al_bl & (y == 1)).sum())
+            blocklist["comparison_n"] = n_bl
+            blocklist["scorer_precision_same_n"] = hits_bl / n_bl
+            blocklist["scorer_fs_catches_same_n"] = int((al_bl & fs).sum())
         res.sentence = (
-            f"{n_red:,} of the alerts your metric counts as wins were later "
-            f"attempts by fraudsters already caught in this window. Those "
-            f"prevented nothing. Counted by fraud cases stopped on the "
-            f"first attempt, you stop {pr['fs_recall']:.0%}; your headline "
-            f"number reads {pr['headline_recall']:.0%}."
+            f"Of the {pr['budget']:,} alerts you spent, {pr['hits']:,} hit "
+            f"fraud, and {pr['redundant']:,} of those "
+            f"({pr['redundancy_rate']:.0%} of your correct alerts) were "
+            f"later attempts in cases that had already begun. Those "
+            f"prevented nothing a blocklist would not have caught for "
+            f"free. {pr['fs_catches']:,} alerts stopped a case at its "
+            f"first attempt: the only alerts that prevented a loss."
         )
     else:
         res.sentence = (

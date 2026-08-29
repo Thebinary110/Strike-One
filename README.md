@@ -35,8 +35,8 @@ WHAT WAS READ
 
 THE NUMBER YOU ALREADY HAVE
   average precision 0.4849, ROC-AUC 0.8553
-  at 100 reviews/day, inferred from your fraud volume
-  (pass --capacity to use your real number):
+  at a stated default of 100 reviews/day
+  (pass --capacity with your real number):
   47% of fraud transactions caught, 1,676 good customers flagged
 
 THE NUMBER NOBODY HAS
@@ -44,21 +44,26 @@ THE NUMBER NOBODY HAS
   at those same 100 reviews/day. That is the only moment a loss
   is prevented; everything after it, a blocklist catches for free.
 
-THE GAP, IN YOUR NUMBERS
-  733 of the alerts your metric counts as wins were later attempts by
-  fraudsters already caught in this window. Those prevented nothing.
-  Counted by fraud cases stopped on the first attempt, you stop 54%; your
-  headline number reads 47%.
+WHERE YOUR ALERTS WENT
+  of 3,199 alerts spent:
+     790  stopped a fraud case at its first attempt: the only alerts
+          that prevented a loss
+     733  were later attempts in cases that had already begun
+          (48% of your correct alerts); a blocklist catches these
+          for free
+   1,676  flagged good customers
 
 WHAT A BLOCKLIST GETS YOU FOR FREE
   a plain blocklist, no model, recovers 12.9% of your labelled fraud
-  at 73.0% precision, while stopping 0 cases on the first attempt.
-  That precision is MORE than your scorer's at the same capacity.
+  by flagging 566 transactions at 73.0% precision, with 0 first-attempt stops.
+  At the same 566 alerts your scorer reaches 92.9% precision and stops
+  283 cases first-attempt. Respectable precision, zero prevention:
+  precision without prevention is exactly what it sells.
 
 ONE THING TO DO NEXT
-  routing already-flagged entities to a blocklist lane would free about
-  1 of your 100 reviews/day for fraud that is actually new.
-  Measure it on your scorer: strikeone route <your file>
+  about 23 of your 100 reviews/day went to cases that had already
+  begun. How many of those a blocklist lane actually recovers depends on
+  your 7-day label maturity. Measure it: strikeone route <your file>
 
 AT OTHER REVIEW BUDGETS
   reviews/day txns caught stopped 1st wasted-on-known good flagged
@@ -96,11 +101,14 @@ strikeone audit yourdata.parquet \
 ```
 
 `strikeone audit` answers, for YOUR labelled data: how many of your fraud
-cases are stopped at the first attempt (vs what your headline AP/recall
-says), what share of your correct alerts land on entities a blocklist
-already knows, and how much of your headline metric a blocklist alone
-recovers. `strikeone route` wraps whatever scorer you already run with
-the two-lane routing and measures the lift. `strikeone policy` turns
+cases are stopped at the first attempt, how many of your alerts were
+later attempts in cases that had already begun, and how much of your
+labelled fraud a blocklist alone recovers. (The hero above audits the
+frozen worked-example scorer standalone on its window, so its numbers
+legitimately differ from the two-lane system results in `reports/stage7`;
+the command prints the exact reconciliation.) `strikeone route` wraps
+whatever scorer you already run with the two-lane routing and measures
+the lift. `strikeone policy` turns
 declared-range economics into {approve, step-up, block} recommendations.
 Mapping examples, including a PSP-shaped disputes export: `examples/`.
 

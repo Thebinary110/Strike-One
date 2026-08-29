@@ -139,3 +139,35 @@ def test_synthetic_example_is_deterministic():
     a, b = synthetic(seed=7), synthetic(seed=7)
     assert len(a) == len(b)
     assert float(a["model_score"].sum()) == float(b["model_score"].sum())
+
+
+def test_blocklist_comparison_is_budget_matched():
+    # regression: a precision comparison at unmatched alert counts shipped
+    # twice (Stage 4, then the audit output). Any comparison the output
+    # renders must be computed at the blocklist's own N.
+    df, _ = mapped()
+    r = audit(df, label_delay_days=7.0)
+    n = r.blocklist["comparison_n"]
+    assert n == r.blocklist["flagged_rows"] == 1
+    # independent recomputation of the scorer at exactly N alerts:
+    # top-1 by score is the 0.9 row (a fraud) -> precision 1.0, and it is
+    # e1's first strike -> 1 first-attempt stop
+    assert r.blocklist["scorer_precision_same_n"] == pytest.approx(1.0)
+    assert r.blocklist["scorer_fs_catches_same_n"] == 1
+
+
+def test_next_action_derives_from_wasted_column():
+    # regression: 'reviews freed/day' once used a different computation
+    # than the wasted-on-known column and contradicted it on screen
+    df, _ = mapped()
+    r = audit(df, label_delay_days=7.0)
+    pr = next(x for x in r.budgets if x["primary"])
+    wasted_per_day = pr["redundant"] / max(r.stats["days"], 1)
+    text = r.to_text()
+    if wasted_per_day >= 0.5:
+        assert f"about {wasted_per_day:.0f} of your" in text
+    # and the budget rows always reconcile internally
+    for row in r.budgets:
+        assert row["hits"] + row["false_positives"] == row["budget"]
+        assert row["fs_catches"] <= row["hits"]
+        assert row["redundant"] <= row["hits"]

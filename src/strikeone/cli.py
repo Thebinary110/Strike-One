@@ -105,11 +105,17 @@ def cmd_audit(args) -> int:
         print("\n(synthetic demonstration data; run against your own file "
               "with --map, or the frozen IEEE-CIS worked example)")
     if args.example == "ieee-cis" and not args.json:
-        print("\nnote: this file is audited as a standalone window, exactly "
-              "as your export\nwould be. The frozen stage reports evaluate "
-              "the same window with the full\n182-day stream behind it, so "
-              "episode counts differ (1,198 there vs the\nwithin-window "
-              "count here), legitimately.")
+        print("""
+why these numbers differ from reports/stage7 (they should, and here is how):
+  scorer: this audits the frozen lane-2 model A2 standalone; the stage-7
+    headline AP 0.5319 is Baseline A, and its 698/1,198 counters are the
+    two-lane SYSTEM (blocklist lane + A2), not a bare scorer
+  window: case boundaries and the blocklist here see only this file
+    (1,462 cases, 566 flags at 73.0%); stage 7 had the full 182-day
+    stream behind the same window (1,198 cases, 1,775 flags at 49.8%)
+  alerts: 100/day x the exact 31.9985-day span = 3,199 vs stage 7's 3,200
+Your own export gets exactly this standalone treatment, which is why the
+hero shows it.""")
     return 0
 
 
