@@ -112,12 +112,25 @@ def policy(df: pd.DataFrame, params: dict | None = None,
     if has_labels:
         y = df["label"].to_numpy().astype(int)
 
+        # Best fixed threshold (block above tau, approve below), for any
+        # cost corner. The threshold cost is linear in (m, c_h):
+        #   cost(tau) = sum_{p<tau} y*(A+c_h) + sum_{p>=tau} (1-y)*m*A
+        # so precompute, per candidate tau, the three aggregates once and
+        # the per-corner search is O(#taus) instead of O(#taus * n).
+        taus = np.unique(np.quantile(pcol, np.linspace(0, 1, 101)))
+        order = np.argsort(pcol, kind="stable")
+        p_s, y_s, a_s = pcol[order], y[order], amt[order]
+        cut = np.searchsorted(p_s, taus, side="left")
+        c_ya = np.concatenate([[0.0], np.cumsum(y_s * a_s)])
+        c_y = np.concatenate([[0.0], np.cumsum(y_s)])
+        c_la = np.concatenate([[0.0], np.cumsum((1 - y_s) * a_s)])
+        t_fraud_amt = c_ya[cut]                    # approved fraud amount
+        t_fraud_cnt = c_y[cut]                     # approved fraud count
+        t_legit_amt = c_la[-1] - c_la[cut]         # blocked legit amount
+
         def fixed_cost(pr):
-            best = np.inf
-            for tau in np.unique(np.quantile(pcol, np.linspace(0, 1, 101))):
-                a2 = np.where(pcol >= tau, M.BLOCK, M.APPROVE)
-                best = min(best, float(M.realized_cost(y, a2, amt, pr).sum()))
-            return best
+            return float(np.min(t_fraud_amt + pr.c_h * t_fraud_cnt
+                                + pr.m * t_legit_amt))
 
         c_pol = float(M.realized_cost(y, act, amt, prm).sum())
         c_app = float(M.realized_cost(y, np.zeros(len(y)), amt, prm).sum())
