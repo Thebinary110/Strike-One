@@ -1,0 +1,320 @@
+"""Stage 7 — open the holdout EXACTLY ONCE and execute the pre-registered
+analysis plan (reports/holdout_prediction.md, committed 188b471) verbatim.
+
+This is the only code that ever reads the sealed file. It refuses to run
+if the access log is not empty, calls seal.load_holdout exactly once, and
+asserts the log holds exactly one entry when it finishes. Every reported
+figure is one of the eight pre-registered items; nothing else is computed.
+
+Holdout labels are used (a) as evaluation targets and (b) inside
+label-derived features only through the 7-day-delay machinery, exactly as
+in validation — the production simulation. Calibration maps were frozen
+before unsealing and are only APPLIED here.
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+
+import lightgbm as lgb
+import numpy as np
+import pandas as pd
+
+from strikeone import config, entity, episodes, features, seal
+from strikeone import metrics as M
+
+sys.path.insert(0, str(config.REPO_ROOT / "scripts"))
+from stage2_baseline_b import build_entity_features  # noqa: E402
+
+OUT = config.REPORTS / "stage7"
+MODELS = config.REPO_ROOT / "models"
+N_BOOT = 1000
+CAPS = [5, 10, 18, 25, 36, 50, 71, 100, 140, 200, 280, 400, 500]
+
+
+def predict(model_file: str, train_df: pd.DataFrame, target_df: pd.DataFrame,
+            extra_tr=None, extra_tg=None) -> np.ndarray:
+    if extra_tr is not None:
+        train_df = pd.concat([train_df.reset_index(drop=True),
+                              extra_tr.reset_index(drop=True)], axis=1)
+        target_df = pd.concat([target_df.reset_index(drop=True),
+                               extra_tg.reset_index(drop=True)], axis=1)
+    X_tr, X_tg, cols, _ = features.build_matrices(train_df, target_df)
+    booster = lgb.Booster(model_file=str(MODELS / model_file))
+    assert booster.feature_name() == cols, f"feature drift for {model_file}"
+    return booster.predict(X_tg)
+
+
+def ci_metric(y, s, fn):
+    return M.bootstrap_ci(lambda i: fn(y[i], s[i]), len(y), N_BOOT, config.SEED)
+
+
+def main():
+    OUT.mkdir(parents=True, exist_ok=True)
+    log = config.HOLDOUT_ACCESS_LOG.read_text()
+    assert log == "", (
+        "access log is not empty — the holdout was already opened; "
+        "Stage 7 does not run twice"
+    )
+
+    dfm = pd.read_parquet(config.MODELING_PARQUET)
+
+    # ======================= THE ONE UNSEAL ==============================
+    holdout = seal.load_holdout(
+        unseal=True,
+        reason=(
+            "Stage 7 final evaluation per pre-registered plan "
+            "(reports/holdout_prediction.md, commit 188b471)"
+        ),
+    )
+    # =====================================================================
+
+    df = (
+        pd.concat([dfm, holdout], ignore_index=True)
+        .sort_values(["TransactionDT", "TransactionID"])
+        .reset_index(drop=True)
+    )
+    uid, _ = entity.build_uid(df)
+    df["uid"] = uid
+    t = df["TransactionDT"].to_numpy()
+    tb = df["TransactionID"].to_numpy()
+    y_all = df["isFraud"].to_numpy()
+    roles_all = episodes.episode_roles(uid.to_numpy(), t, y_all, tiebreak=tb)
+    bl = entity.pit_delayed_label_stats(uid, t, y_all, tb, prefix="uid")
+    flag_all = np.nan_to_num(bl["uid_fraud_rate"].to_numpy()) > 0
+    d = df["day_idx"].to_numpy()
+    ho = (d >= 151) & (d <= 182)
+    n_days = int(df.loc[ho, "day_idx"].nunique())
+
+    y = y_all[ho]
+    amt = df.loc[ho, "TransactionAmt"].to_numpy()
+    roles = roles_all[ho]
+    flag = flag_all[ho]
+    uid_ho = uid.to_numpy()[ho]
+    fs = roles == episodes.ROLE_FIRST_STRIKE
+    prop = roles == episodes.ROLE_PROPAGATED
+    n_eps = int(fs.sum())
+    lane2 = ~flag
+
+    struct = {
+        "rows": int(ho.sum()), "n_days": n_days,
+        "positives": int(y.sum()),
+        "fs_episodes": n_eps,
+        "propagated_rows": int(prop.sum()),
+        "propagated_share_of_positives": round(float(prop.sum() / y.sum()), 4),
+        "lane1_rows": int(flag.sum()),
+        "lane1_row_share": round(float(flag.mean()), 4),
+        "lane1_positive_share": round(float(y[flag].sum() / y.sum()), 4),
+        "lane1_fs_rows": int((flag & fs).sum()),
+        "lane1_legit_blocked": int((flag & (y == 0)).sum()),
+    }
+    print("STRUCTURE:", json.dumps(struct, indent=2))
+
+    # ---- score holdout with the frozen / prepared models -----------------
+    df_nouid = df.drop(columns=["uid"])
+    tr112 = df_nouid[(d >= 1) & (d <= 112)]
+    tr147 = df_nouid[(d >= 1) & (d <= 147)]
+    ho_df = df_nouid[ho]
+    print("scoring A (frozen) ...")
+    s_a = predict("baseline_a.txt", tr112, ho_df)
+    print("scoring B (prepared pre-unseal) ...")
+    beh, lab = build_entity_features(df.rename(columns={}))
+    ent = pd.concat([beh, lab], axis=1)
+    tr112_m = ((d >= 1) & (d <= 112))
+    s_b = predict("stage7_b.txt", df_nouid[tr112_m], ho_df,
+                  extra_tr=ent[tr112_m], extra_tg=ent[ho])
+    print("scoring A2 (frozen) ...")
+    elig112 = tr112_m & ~flag_all
+    s_a2 = predict("lane2_a2.txt", df_nouid[elig112], ho_df)
+    print("scoring secondary A / A2 (prepared pre-unseal) ...")
+    s_sec_a = predict("stage7_secondary_a.txt", tr147, ho_df)
+    elig147 = (d >= 1) & (d <= 147) & ~flag_all
+    s_sec_a2 = predict("stage7_secondary_a2.txt", df_nouid[elig147], ho_df)
+
+    frozen4 = json.loads(
+        (config.REPORTS / "stage4" / "shipped_system_frozen.json").read_text())
+    p_shipped = np.interp(s_a2, frozen4["calibration"]["isotonic_x"],
+                          frozen4["calibration"]["isotonic_y"])
+    sec_cal = json.loads((OUT / "secondary_calibration.json").read_text())
+    p_sec = np.interp(s_sec_a2, sec_cal["isotonic_x"], sec_cal["isotonic_y"])
+    prm = M.CostParams(**frozen4["cost_params_central"])
+
+    R = {"structure": struct}
+
+    # ---- item 1 [PRIMARY]: A headline vs pre-registered ranges -----------
+    R["item1_A_frozen"] = {
+        "ap": ci_metric(y, s_a, M.average_precision),
+        "roc_auc": ci_metric(y, s_a, M.roc_auc),
+        "preregistered_ap_range": [0.32, 0.48],
+        "preregistered_auc_range": [0.86, 0.91],
+    }
+    print("1. A:", R["item1_A_frozen"])
+
+    # ---- item 2 [PRIMARY]: B and the distortion size ----------------------
+    dap = M.paired_bootstrap_diff(
+        lambda i: M.average_precision(y[i], s_a[i]),
+        lambda i: M.average_precision(y[i], s_b[i]),
+        len(y), N_BOOT, config.SEED)
+    R["item2_B"] = {
+        "ap": ci_metric(y, s_b, M.average_precision),
+        "roc_auc": ci_metric(y, s_b, M.roc_auc),
+        "b_minus_a_ap": dap,
+        "predicted_gap_range": [0.06, 0.14],
+        "validation_gap": 0.1743,
+    }
+    print("2. B:", R["item2_B"])
+
+    # ---- item 3 [PRIMARY]: the inversion at blocklist natural budget ------
+    n_bl = int(flag.sum())
+    inv = {}
+    for name, alert in [
+        ("blocklist", flag.copy()),
+        ("A", M.alerts_at_budget(s_a, n_bl)),
+        ("B", M.alerts_at_budget(s_b, n_bl)),
+    ]:
+        inv[name] = {
+            "txn_precision": round(float(y[alert].mean()), 4),
+            "fs_catches": int((alert & fs).sum()),
+            "fs_recall": round(float((alert & fs).sum() / n_eps), 4),
+        }
+    R["item3_inversion"] = {"budget": n_bl, **inv}
+    print("3. inversion:", json.dumps(R["item3_inversion"]))
+
+    # ---- item 4 [PRIMARY]: routing inoculation at 18/day ------------------
+    b18 = 18 * n_days
+    al_off = M.alerts_at_budget(s_b, b18)
+    s_b_l2 = np.where(lane2, s_b, -np.inf)
+    al_on = M.alerts_at_budget(s_b_l2, b18)
+    fsr_off = float(al_off[fs].mean())
+    fsr_on = float(al_on[fs].mean())  # lane-1 adds 0 FS by construction
+    R["item4_routing"] = {
+        "budget": b18, "B_unrouted_fs_recall": round(fsr_off, 4),
+        "B_routed_fs_recall": round(fsr_on, 4),
+        "ratio": round(fsr_on / fsr_off, 2) if fsr_off else None,
+        "validation_ratio": 3.1, "predicted_ratio_range": [1.5, 2.8],
+    }
+    print("4. routing:", R["item4_routing"])
+
+    # ---- item 5: episode table + counters at 100/day ----------------------
+    b100 = 100 * n_days
+    systems = {
+        "two-lane+A2 (shipped)": (np.where(lane2, s_a2, -np.inf), True),
+        "single-lane A": (s_a, False),
+        "single-lane B": (s_b, False),
+    }
+    tbl = {}
+    al_ship = None
+    for name, (s, routed) in systems.items():
+        alert = M.alerts_at_budget(s, b100)
+        if name.startswith("two-lane"):
+            al_ship = alert
+        r = episodes.friction_accounting(roles, alert, amt)
+        tbl[name] = {
+            "fs_catches": r.first_strike_catches,
+            "fs_recall": round(r.first_strike_recall, 4),
+            "friction_eff": round(r.friction_efficiency, 4),
+            "redundant": r.redundant,
+            "redundancy_rate": round(r.redundancy_rate, 4),
+            "false_positives": r.false_positives,
+            "txn_precision": round(float(y[alert].mean()), 4),
+        }
+    tbl["blocklist"] = {
+        "fs_catches": 0, "fs_recall": 0.0,
+        "friction_eff": 0.0,
+        "redundant": int((flag & prop).sum()),
+        "redundancy_rate": 1.0,
+        "false_positives": int((flag & (y == 0)).sum()),
+        "txn_precision": round(float(y[flag].mean()), 4),
+        "budget": n_bl,
+    }
+    al_b100 = M.alerts_at_budget(s_b, b100)
+
+    def fsr_fn(alert):
+        return lambda i: (float(alert[i][fs[i]].mean()) if fs[i].any() else np.nan)
+
+    d5 = M.paired_bootstrap_diff(fsr_fn(al_b100), fsr_fn(al_ship),
+                                 len(y), N_BOOT, config.SEED, groups=uid_ho)
+    R["item5_episode_table"] = {
+        "budget": b100, "n_episodes": n_eps, "table": tbl,
+        "shipped_minus_B_fs_recall": d5,
+        "counters": {
+            "episodes_stopped_at_strike_one": tbl["two-lane+A2 (shipped)"]["fs_catches"],
+            "of_episodes": n_eps,
+            "alerts_on_already_flagged": tbl["two-lane+A2 (shipped)"]["redundant"],
+            "lane1_handled": int(flag.sum()),
+            "lane1_legit_blocked": int((flag & (y == 0)).sum()),
+        },
+    }
+    print("5. episode table:", json.dumps(R["item5_episode_table"], indent=2))
+
+    # ---- item 6: capacity curves ------------------------------------------
+    curves = {}
+    for cname, s, routed in [
+        ("shipped/on", np.where(lane2, s_a2, -np.inf), True),
+        ("shipped/off", s_a2, False),
+        ("headline/on", s_b_l2, True),
+        ("headline/off", s_b, False),
+    ]:
+        vals = []
+        for c in CAPS:
+            al = M.alerts_at_budget(s, c * n_days)
+            vals.append(round(float(al[fs].mean()), 4))
+        curves[cname] = vals
+    R["item6_curves"] = {"per_day": CAPS, "series": curves}
+    print("6. curves:", json.dumps(curves))
+
+    # ---- item 7: secondary ------------------------------------------------
+    dsec = M.paired_bootstrap_diff(
+        lambda i: M.average_precision(y[i], s_a[i]),
+        lambda i: M.average_precision(y[i], s_sec_a[i]),
+        len(y), N_BOOT, config.SEED)
+    al_sec = M.alerts_at_budget(np.where(lane2, s_sec_a2, -np.inf), b100)
+    rsec = episodes.friction_accounting(roles, al_sec, amt)
+    R["item7_secondary"] = {
+        "ap": ci_metric(y, s_sec_a, M.average_precision),
+        "roc_auc": ci_metric(y, s_sec_a, M.roc_auc),
+        "preregistered_ap_range": [0.50, 0.62],
+        "preregistered_auc_range": [0.90, 0.93],
+        "secondary_minus_primary_ap": dsec,
+        "secondary_counters_100pd": {
+            "episodes_stopped_at_strike_one": rsec.first_strike_catches,
+            "fs_recall": round(rsec.first_strike_recall, 4),
+            "alerts_on_already_flagged": rsec.redundant,
+        },
+    }
+    print("7. secondary:", json.dumps(R["item7_secondary"], indent=2))
+
+    # ---- item 8: loss-weighted FS recall, shipped @100/day ----------------
+    rship = episodes.friction_accounting(roles, al_ship, amt)
+    R["item8_loss_weighted_fs_recall"] = {
+        "value": round(rship.loss_weighted_fs_recall, 4),
+        "validation_reference": 0.415,
+    }
+    print("8. lw fs recall:", R["item8_loss_weighted_fs_recall"])
+
+    # ---- console replay file (same schema as validation replay) -----------
+    ec = M.expected_cost_matrix(p_shipped, amt, prm)
+    action = np.where(flag, M.BLOCK, ec.argmin(axis=1)).astype(np.int8)
+    pd.DataFrame({
+        "TransactionID": df.loc[ho, "TransactionID"].to_numpy(),
+        "t": t[ho], "day": df.loc[ho, "day"].to_numpy(),
+        "day_idx": d[ho], "uid": uid_ho, "amount": amt, "y": y,
+        "role": roles, "lane1_flag": flag,
+        "s_shipped": s_a2, "s_headline": s_b, "p_shipped": p_shipped,
+        "action_central": action,
+        "ProductCD": df.loc[ho, "ProductCD"].to_numpy(),
+        "P_emaildomain": df.loc[ho, "P_emaildomain"].to_numpy(),
+        "card1": df.loc[ho, "card1"].to_numpy(),
+    }).to_parquet(config.DATA_PROCESSED / "holdout_replay.parquet", index=False)
+    print("holdout_replay.parquet written (console: --data ...)")
+
+    (OUT / "results.json").write_text(json.dumps(R, indent=2, default=float))
+
+    entries = config.HOLDOUT_ACCESS_LOG.read_text().splitlines()
+    assert len(entries) == 1, f"expected exactly 1 access, log has {len(entries)}"
+    print(f"ACCESS LOG (exactly one entry): {entries[0]}")
+
+
+if __name__ == "__main__":
+    main()
