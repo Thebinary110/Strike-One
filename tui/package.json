@@ -1,0 +1,20 @@
+{
+  "name": "strikeone-tui",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "bin": { "strikeone-tui": "dist/cli.js" },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/cli.js"
+  },
+  "dependencies": {
+    "ink": "^5.2.0",
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.0",
+    "typescript": "^5.6.0"
+  }
+}

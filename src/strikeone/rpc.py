@@ -120,9 +120,12 @@ class Session:
 
     def policy(self, p):
         self._need()
-        res = policy_engine.policy(self.df, p or {})
+        p = dict(p or {})
+        want_grid = bool(p.pop("grid", False))
+        res = policy_engine.policy(self.df, p, grid=want_grid)
         return {"params": res.params, "mix": res.mix, "costs": res.costs,
-                "worst_corner": res.worst_corner}
+                "worst_corner": res.worst_corner,
+                "ranges": policy_engine.DECLARED_RANGES}
 
     # --------------------------------------------------------- screens
     def stream(self, p):
@@ -162,7 +165,21 @@ class Session:
                           "fs": a["roles"] == episodes.ROLE_FIRST_STRIKE})
         agg = d.groupby("e").agg(n=("y", "size"), frauds=("y", "sum"),
                                  fs=("fs", "sum"))
-        good = agg[(agg["fs"] == 1) & (agg["frauds"] >= 2)]
+        # deterministic curation: one clear first strike, several later
+        # attempts, small enough to read as a story; prefer fully-resolved
+        # entity ids (no pooled 'nan' component)
+        for min_f, max_n, legit, resolved in [
+            (3, 24, True, True), (2, 24, True, True), (3, 40, True, False),
+            (2, 999999, False, False), (1, 999999, False, False),
+        ]:
+            good = agg[(agg["fs"] == 1) & (agg["frauds"] >= min_f)
+                       & (agg["n"] <= max_n)]
+            if legit:  # the story needs quiet purchases before the strike
+                good = good[good["n"] >= good["frauds"] + 2]
+            if resolved:
+                good = good[~good.index.astype(str).str.contains("nan")]
+            if len(good) >= 5:
+                break
         good = good.sort_values(["frauds", "n"], ascending=False).head(10)
         out = [{"entity": str(e), "n": int(r["n"]), "frauds": int(r["frauds"])}
                for e, r in good.iterrows()]

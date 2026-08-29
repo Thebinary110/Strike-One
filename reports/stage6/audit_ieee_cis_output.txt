@@ -1,0 +1,26 @@
+STRIKE ONE AUDIT
+  92,427 transactions over 32.0 days; 3,213 fraud-labelled (3.48%)
+  fraud cases (episodes): 1,462   first strikes: 1,462   later attempts on known entities: 1,751 (54.5% of fraud rows)
+
+BLOCKLIST RECOVERY (no model at all, 7-day label delay)
+  a plain blocklist recovers 413 of your fraud rows = 12.9% of labelled fraud, 10.5% of fraud amount
+  it stops 0 fraud cases at the first attempt, at 73.0% transaction precision
+
+YOUR SCORER, HEADLINE VIEW
+  average precision 0.4849   ROC-AUC 0.8553
+
+YOUR SCORER, CORRECTED VIEW (per review budget)
+  alerts/day  headline recall  first-strike recall  redundancy  wrongly flagged
+          1            1.0%                1.6%      25.8%                0
+          2            2.0%                2.7%      38.1%                0
+          5            4.9%                6.1%      43.3%                2
+         10            9.6%               11.7%      44.3%               12
+         20           18.2%               21.9%      45.2%               55
+         50           36.2%               44.0%      44.6%              437
+        100           47.4%               54.0%      48.1%            1,676  <- primary
+        200           57.8%               62.9%      50.4%            4,543
+        500           72.7%               77.5%      51.5%           13,662
+
+THE GAP: at 100 alerts/day your scorer reports 47% recall, but only 54% of fraud cases are stopped at their first attempt, and 48% of its correct alerts land on entities a 7-day blocklist already knows. The difference is what your headline metric is over-crediting.
+
+(the audit treats this file as a standalone window, exactly as it would treat your export: entity history outside the file does not exist for the tool. The frozen stage reports in reports/ evaluate the same window with the full 182-day stream behind it, so their episode counts differ, legitimately: 1,198 episodes there vs the within-window count here.)

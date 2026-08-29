@@ -74,12 +74,12 @@ class AuditResult:
             L.append("")
             L.append("YOUR SCORER, CORRECTED VIEW (per review budget)")
             L.append("  alerts/day  headline recall  first-strike recall  "
-                      "redundancy  friction eff.")
+                      "redundancy  wrongly flagged")
             for r in self.budgets:
                 mark = "  <- primary" if r["primary"] else ""
                 L.append(f"  {r['per_day']:>9,}  {r['headline_recall']:>14.1%}"
                          f"  {r['fs_recall']:>18.1%}  {r['redundancy_rate']:>9.1%}"
-                         f"  {r['friction_efficiency']:>12.1%}{mark}")
+                         f"  {r['false_positives']:>15,}{mark}")
         L.append("")
         L.append(self.sentence)
         return "\n".join(L)
@@ -152,6 +152,7 @@ def audit(df: pd.DataFrame, label_delay_days: float = 7.0) -> AuditResult:
             res.budgets.append({
                 "per_day": per_day, "budget": budget,
                 "headline_recall": on_pos / pos if pos else 0.0,
+                "false_positives": int(budget - on_pos),
                 "fs_recall": fs_c / n_eps if n_eps else 0.0,
                 "redundancy_rate": red / on_pos if on_pos else 0.0,
                 "friction_efficiency": fs_c / budget if budget else 0.0,

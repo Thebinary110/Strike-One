@@ -15,7 +15,19 @@ replication point [C3v]. Frames for beats 1–3 and 5 are in
 > and it systematically prefers the model that remembers. I measured how
 > much, and built the fix.
 
-## 0:25–1:10 · The mechanism — SLIDE 2, then the entity timeline
+## 0:25–0:50 · The product — terminal, live
+
+(Terminal: `pip install -e .`, then run the audit against a mapped file.)
+
+> This ships as a package. pip install, point it at your own labelled
+> transactions with a one-time column mapping, and it tells you the number
+> nobody's dashboard shows: how much of your fraud metric is remembering
+> instead of preventing. Your data never leaves the machine. We ship the
+> method and the measurement; you bring the scorer. The IEEE-CIS run
+> you're about to see is the worked example that proves the method, not a
+> deployable model.
+
+## 0:50–1:25 · The mechanism — SLIDE 2, then the entity timeline
 
 (Console open on `--data data/processed/holdout_replay.parquet`, "show a
 real episode" clicked, for the timeline shot.)
@@ -54,35 +66,35 @@ Optional 8s, only with the caveat in the same breath [C8]:
 > it gets there on features that encode the labelling rule, while
 > preventing less. That's not a brag. It's the bug.
 
-## 2:00–3:15 · The console, live — screen recording, one take
+## 2:00–3:15 · The TUI, live — screen recording, one take
 
-Console on the HOLDOUT replay. Both systems are permanently side by side;
-the delta sits between them. Drive: default 100/day → drag the capacity
-playhead down to 18/day → tick "Auto-block known fraudsters" under the
-standard pick → untick → click one decision row for the why panel. The
-"good customers wrongly flagged" numbers stay on screen throughout.
+`strikeone tui`, IEEE-CIS worked example loaded. Drive: AUDIT tab at the
+primary budget → `h` twice to tighten the budget → tab to ROUTE (both
+curves on screen) → tab to CASE and let the case unfold. The
+wrongly-flagged column stays on screen throughout.
 
-> This is the held-out month replaying through the frozen system, both
-> systems at once, same budget. At a hundred alerts a day: fifty-five
-> more fraud cases stopped at the first attempt, seven hundred
-> thirty-three fewer reviews wasted, at the price of six hundred
-> seventy-eight more wrongly flagged customers. All three numbers stay on
-> screen.
+> This is the terminal UI on the held-out month, through the frozen
+> pipeline. The audit view: at a hundred alerts a day the headline metric
+> says forty-seven percent recall; the corrected view says fifty-four
+> percent of fraud cases stopped at the first attempt, with forty-eight
+> percent of the correct alerts landing on entities a seven-day blocklist
+> already knows, and one thousand six hundred seventy-six wrongly flagged
+> good customers, on screen, in red.
 >
-> (drag playhead to 18/day) Tighten capacity to what a small risk team
-> actually has, and watch the gap. The standard pick collapses to
-> zero-point-one-zero first-attempt recall; this system holds
-> zero-point-two-two [C4].
+> (h, h: budget to 20/day) Tighten the budget to what a small team
+> actually has and the redundancy is still forty-five percent. The
+> headline metric never shows you this column.
 >
-> (tick the auto-block checkbox under the standard pick) And here's the
-> product. Give their model the blocklist lane, zero model changes, and
-> it recovers to zero-point-two-three. Two point three times the
-> prevention, free [C4]. The routing protects any scorer. It works on
-> their engine, not just mine.
+> (tab: ROUTE) And here's the part that works on their engine, not just
+> mine: the same scorer, with and without the blocklist lane in front of
+> it. At eighteen alerts a day the lane takes first-attempt recall from
+> zero-point-one-zero to zero-point-two-three: two point three times the
+> prevention, zero model changes [C4].
 >
-> (click a decision row, why panel opens, ~8s) Every decision explains
-> itself: the risk, what the system knew, the cost of each option at your
-> economics, and exactly what would have changed the outcome.
+> (tab: CASE, the case unfolds) One fraud case, start to finish: quiet
+> purchases, the first attempt in red, and everything after it already
+> covered by the blocklist. Catching those later attempts is what the
+> standard metric keeps rewarding.
 
 ## 3:15–4:00 · The honest ledger — SLIDE 6
 

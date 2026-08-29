@@ -71,7 +71,8 @@ def _clamp(params: dict) -> M.CostParams:
     return M.CostParams(**out)
 
 
-def policy(df: pd.DataFrame, params: dict | None = None) -> PolicyResult:
+def policy(df: pd.DataFrame, params: dict | None = None,
+           grid: bool = True) -> PolicyResult:
     if "p" not in df.columns or df["p"].isna().all():
         raise ValueError(
             "policy needs a calibrated probability column: --map p=<column>. "
@@ -114,6 +115,8 @@ def policy(df: pd.DataFrame, params: dict | None = None) -> PolicyResult:
         res.costs = {"policy": c_pol, "approve_all": c_app,
                      "fixed_threshold": fixed_cost(prm),
                      "savings": (c_app - c_pol) / c_app if c_app else 0.0}
+        if not grid:
+            return res
         worst = None
         for m_, a_, e_, ch_ in itertools.product(*DECLARED_RANGES.values()):
             pr = M.CostParams(m=m_, a=a_, e=e_, c_h=ch_)
