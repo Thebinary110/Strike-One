@@ -148,3 +148,78 @@ exactly once, by one script, logging exactly one access.
   out-of-time for the pipeline).
 - Sanity ceiling stands: pooled holdout ROC-AUC above ~0.95 is a bug
   report, not a result.
+
+## Second holdout access — pre-registered (2026-08-30, before unsealing)
+
+The integrity rule was never "never compute on the holdout"; it was
+"never SELECT on it". This access adds baselines and robustness checks we
+do not use to choose anything. **The shipped system is frozen and NOTHING
+computed in this access may change it. If a result is unfavourable it is
+reported, not acted on.** All three analyses run in a SINGLE unsealing,
+producing exactly one new access-log entry whose stated reason references
+the commit of this section.
+
+### Analysis plan (exact; nothing added or dropped after numbers are seen)
+
+All at matched alert budgets; primary operating point 100 alerts/day
+(3,200 alerts); k-curve grid {500, 1000, 1500, 2000, 3200, 4000, 6000}.
+Roles on the global 1-182 stream, pooled-UID key, as everywhere.
+
+1. **[PRIMARY] Rank-by-amount baseline** (alerts = largest amounts first,
+   no model) and **random ranking** (seeded, the floor), added to the
+   holdout comparison alongside blocklist-only, A, A2, and B. Per system,
+   per budget: first-hit recall, LOSS-WEIGHTED first-hit recall,
+   transaction precision, blocklist-coverable share of correct alerts,
+   false positives. Primary comparison: rank-by-amount vs shipped
+   two-lane+A2 on loss-weighted first-hit recall at 3,200.
+2. **[PRIMARY] Label-maturity sweep, evaluation-side only**, delay d in
+   {1, 3, 7, 14, 30} days: lane-1 (blocklist) size, coverage of labelled
+   fraud, precision; blocklist-coverable-visible share; and the paired
+   first-hit-recall delta (shipped two-lane+A2 minus single-lane B) with
+   a uid-cluster bootstrap CI at 100/day for each d. SCOPE LIMIT, stated:
+   the sweep varies maturity on the evaluation side (episode/blocklist
+   construction). B's label-derived features remain trained at 7 days; a
+   fully consistent sweep would retrain per d, and we did not.
+3. **[PRIMARY] Cost-claim rebuild** (replacing the withdrawn "81/81"
+   framing): policy = frozen isotonic + argmin (fitted on VALIDATION
+   only; asserted). Comparator = single fixed threshold on the same
+   calibrated p, TUNED PER CORNER ON VALIDATION (grid of 101 quantile
+   thresholds minimising validation realized cost), then BOTH evaluated
+   on HOLDOUT rows, per corner of the original 81 (s=0) declared-range
+   grid. Per corner: row-bootstrap CI (400 resamples) of
+   (cost_fixed - cost_policy)/cost_approve_all. Report "k of 81 corners
+   with CIs excluding zero" plus median effect with its interval; never a
+   bare count. The counterfactual assumption is stated with the numbers:
+   a blocked fraudulent transaction is assumed prevented; a stepped-up
+   one is prevented with probability e; sensitivity to that assumption is
+   the e (and s) dimension of the grid. Cawley & Talbot (JMLR 2010) cited
+   for why the original same-data framing was invalid.
+
+### Predicted outcomes, with reasoning
+
+- **Rank-by-amount**: loss-weighted metrics are mechanically favourable
+  to amount-ranking (the metric's numerator is denominated in the ranking
+  key), but at 3.5% prevalence the top-3,200-by-amount alert set should
+  be overwhelmingly legitimate. Predict: loss-weighted first-hit recall
+  in **0.05-0.20** at 3,200 vs the shipped 0.4733; it does NOT beat us
+  (ratio >= 2x in our favour). Genuine uncertainty: if fraud amounts are
+  strongly top-heavy this narrows; if rank-by-amount wins, that is a
+  finding for the README, not a failure. Random floor: recall tracking
+  the budget share, ~3-4% on all metrics.
+- **Maturity sweep at 30 days**: lane-1 shrinks (fewer flags are >=30d
+  old inside a 182-day history: predict roughly 1,300-1,700 flags vs
+  1,775 at 7d), blocklist coverage of labelled fraud falls a few points,
+  and the shipped-vs-B first-hit delta at 100/day SHRINKS from +0.046
+  (7d) toward **+0.01 to +0.04 but stays positive**; direction does not
+  reverse anywhere in {1..30}. If it reverses, the boundary gets named in
+  the README like the vanishing corner.
+- **Rebuilt cost claim**: unanimity dies with out-of-sample evaluation
+  and per-corner CIs. Predict **k in [35, 65] of 81** corners with CIs
+  excluding zero in the policy's favour, median effect **+1% to +4%** of
+  approve-all cost. If k falls below ~20 the claim is withdrawn entirely
+  per the fallback.
+
+### Commitment
+
+One unsealing, one new log entry (reason cites this section's commit
+hash), no iteration afterwards, results reported whatever they are.
