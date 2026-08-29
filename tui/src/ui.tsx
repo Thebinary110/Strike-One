@@ -100,6 +100,45 @@ export function braillePlot(
   return {lines, legend};
 }
 
+// ---- the wordmark: big block logotype for the landing screen -----------
+const STRIKE_ROWS = [
+  '███████ ████████ ██████  ██ ██   ██ ███████',
+  '██         ██    ██   ██ ██ ██  ██  ██     ',
+  '███████    ██    ██████  ██ █████   █████  ',
+  '     ██    ██    ██   ██ ██ ██  ██  ██     ',
+  '███████    ██    ██   ██ ██ ██   ██ ███████',
+];
+const ONE_ROWS = [
+  ' ██████  ███    ██ ███████',
+  '██    ██ ████   ██ ██     ',
+  '██    ██ ██ ██  ██ █████  ',
+  '██    ██ ██  ██ ██ ██     ',
+  ' ██████  ██   ████ ███████',
+];
+export const Banner = ({width}: {width: number}) => {
+  if (width < 80) {
+    return (
+      <Text bold>
+        STRIKE <Text color={C.accent}>ONE</Text>
+      </Text>
+    );
+  }
+  return (
+    <Box flexDirection="column" marginBottom={1}>
+      {STRIKE_ROWS.map((row, i) => (
+        <Text key={i}>
+          <Text bold>{row}</Text>
+          {'   '}
+          <Text bold color={C.accent}>{ONE_ROWS[i]}</Text>
+        </Text>
+      ))}
+      <Text color={C.dim}>
+        {'  the corrected fraud evaluation. bring your scorer; nothing leaves the machine.'}
+      </Text>
+    </Box>
+  );
+};
+
 export const Stat = ({label, value, color}: {label: string; value: string;
                       color?: string}) => (
   <Box flexDirection="column" marginRight={4}>

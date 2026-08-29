@@ -1,6 +1,6 @@
 import React from 'react';
 import {Box, Text} from 'ink';
-import {Bar, Big, C, Rule, Stat, braillePlot, fmt, pct} from './ui.js';
+import {Banner, Bar, Big, C, Rule, Stat, braillePlot, fmt, pct} from './ui.js';
 
 export type Session = {
   status: 'none' | 'loading' | 'error' | 'ready';
@@ -22,6 +22,7 @@ const Sentence = ({text, width}: {text: string; width: number}) => (
 export const Connect = ({s, width, pathBuf}: {s: Session; width: number;
                          pathBuf: string | null}) => (
   <Box flexDirection="column" gap={1}>
+    <Banner width={width} />
     <Text bold>Point strikeone at labelled transactions. Nothing leaves this
  machine: no telemetry, no network calls.</Text>
     <Box flexDirection="column">
