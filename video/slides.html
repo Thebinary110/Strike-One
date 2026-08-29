@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Strike One — video frames</title>
+<style>
+  :root { --bg:#0f1419; --panel:#171e26; --line:#232d38; --txt:#dbe4ec;
+          --dim:#8296a8; --good:#3ecf8e; --warn:#f0a840; --bad:#ef5b5b;
+          --accent:#5aa9f0; }
+  * { box-sizing:border-box; margin:0; }
+  html,body { height:100%; background:#000;
+    font-family:"Segoe UI", system-ui, sans-serif; }
+  .slide { display:none; width:100vw; height:100vh; background:var(--bg);
+    color:var(--txt); padding:7vh 8vw; flex-direction:column;
+    justify-content:center; position:relative; }
+  .slide.active { display:flex; }
+  .kicker { color:var(--accent); font-size:2.2vh; text-transform:uppercase;
+    letter-spacing:.35em; margin-bottom:3vh; }
+  h1 { font-size:5.6vh; line-height:1.35; font-weight:650; max-width:70vw; }
+  h1 em { color:var(--accent); font-style:normal; }
+  .src { position:absolute; bottom:3vh; right:4vw; color:var(--dim);
+    font-size:1.7vh; font-family:ui-monospace,monospace; }
+  .quote { font-size:3.4vh; line-height:1.6; color:var(--txt);
+    border-left:.5vh solid var(--accent); padding-left:3vw; max-width:74vw;
+    font-style:italic; }
+  .quote b { color:var(--warn); font-style:normal; }
+  .attr { color:var(--dim); font-size:2.2vh; margin-top:3vh; }
+  table { border-collapse:collapse; font-size:3.3vh; margin-top:4vh; }
+  th { color:var(--dim); font-size:2vh; text-transform:uppercase;
+    letter-spacing:.15em; text-align:left; padding:1.2vh 3vw 1.2vh 0; }
+  td { padding:1.6vh 3vw 1.6vh 0; border-top:1px solid var(--line); }
+  .hl td { background:#1c2733; }
+  .num { font-variant-numeric:tabular-nums; font-weight:650; }
+  .g { color:var(--good); } .w { color:var(--warn); } .b { color:var(--bad); }
+  .lesson { font-size:4.6vh; font-weight:650; margin-top:4vh; max-width:76vw;
+    line-height:1.4; }
+  .big-ci { font-size:4.4vh; font-family:ui-monospace,monospace;
+    margin:2.5vh 0; }
+  ul { font-size:3.2vh; line-height:1.9; margin-top:3vh; max-width:74vw;
+    list-style:none; }
+  ul li::before { content:"— "; color:var(--dim); }
+  .score { display:flex; gap:2vw; margin-top:4vh; }
+  .chip { border:1px solid var(--line); border-radius:1.2vh;
+    padding:2vh 2.2vw; background:var(--panel); font-size:2.6vh; }
+  .chip .v { font-size:3.6vh; font-weight:700; display:block; margin-top:.6vh; }
+  footer.help { position:fixed; bottom:1vh; left:1vw; color:#333;
+    font:1.6vh monospace; }
+</style>
+</head>
+<body>
+
+<!-- 1 · cold open -->
+<section class="slide active">
+  <h1>On the most widely used public benchmark for card fraud, the standard
+  evaluation cannot distinguish <em>preventing</em> fraud from
+  <em>remembering</em> it — and it systematically prefers the model that
+  remembers.</h1>
+  <p class="attr" style="margin-top:5vh">Strike One — measured on IEEE-CIS under a chronological protocol,
+  confirmed on a sealed holdout opened once.</p>
+</section>
+
+<!-- 2 · the label rule -->
+<section class="slide">
+  <p class="kicker">How the labels were made — the host's own rule</p>
+  <p class="quote">"…define reported chargeback on the card as fraud
+  transaction (isFraud=1) and <b>transactions posterior to it</b> with
+  either user account, email address or billing address directly linked to
+  these attributes <b>as fraud too</b>. If none of the above is reported
+  and found beyond 120 days, then we define it as legit transaction
+  (isFraud=0)."</p>
+  <p class="attr">One positive class, two different things: the transaction where an
+  episode <b style="color:var(--bad)">starts</b> — and everything after,
+  which any blocklist already covers.</p>
+  <div class="src">competition data description · reports/STAGE_2.md</div>
+</section>
+
+<!-- 3 · lesson one -->
+<section class="slide">
+  <p class="kicker">Holdout · N = 1,775 alerts (the blocklist's natural operating point)</p>
+  <table>
+    <tr><th>system</th><th>transaction precision</th><th>episodes stopped at first strike</th></tr>
+    <tr class="hl"><td>blocklist — no model at all</td>
+        <td class="num w">49.8%</td><td class="num b">0</td></tr>
+    <tr><td>Baseline A (437 features)</td>
+        <td class="num">69.9%</td><td class="num">566</td></tr>
+    <tr><td>B — the model everyone builds</td>
+        <td class="num">89.1%</td><td class="num">442</td></tr>
+  </table>
+  <p class="lesson">Lesson one: precision tells you <span class="b">nothing</span> about prevention.</p>
+  <div class="src">reports/stage7/results.json · canonical_comparisons.md C1</div>
+</section>
+
+<!-- 4 · lesson two -->
+<section class="slide">
+  <p class="kicker">Holdout · same table, second reading</p>
+  <table>
+    <tr><th>system</th><th>transaction precision</th><th>episodes stopped at first strike</th></tr>
+    <tr><td>blocklist — no model at all</td>
+        <td class="num">49.8%</td><td class="num">0</td></tr>
+    <tr class="hl"><td>Baseline A (437 features)</td>
+        <td class="num">69.9%</td><td class="num g">566</td></tr>
+    <tr class="hl"><td>B — the model everyone builds</td>
+        <td class="num g">89.1%</td><td class="num b">442</td></tr>
+  </table>
+  <p class="lesson">Lesson two: the model that wins <span class="g">every headline
+  metric</span> is <span class="b">22% worse</span> at the only thing that
+  stops loss.</p>
+  <div class="src">reports/stage7/results.json · canonical_comparisons.md C1</div>
+</section>
+
+<!-- 5 · replication -->
+<section class="slide">
+  <p class="kicker">B − A, first-strike recall · both single-lane · 100 alerts/day</p>
+  <p class="lesson" style="margin-top:0">Significantly worse at first strikes — twice.</p>
+  <p class="big-ci">validation&nbsp;&nbsp;<span class="b">−0.0163</span>&nbsp;
+     [−0.0307, −0.0027]</p>
+  <p class="big-ci">holdout&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="b">−0.0192</span>&nbsp;
+     [−0.0326, −0.0052]</p>
+  <p class="attr">Paired bootstrap, entity-clustered. The confidence interval excludes
+  zero in both periods — while the same model wins AP by +0.18.</p>
+  <div class="src">reports/stage3/episode_analysis.json · reports/stage7/results.json · C3/C3v</div>
+</section>
+
+<!-- 6 · honest ledger -->
+<section class="slide">
+  <p class="kicker">The honest ledger — shipped system, holdout, 100 alerts/day</p>
+  <ul>
+    <li>Lowest transaction precision of the three: <b class="num">0.434</b></li>
+    <li>False positives at this budget: <b class="num">1,810</b> — each one
+        frictions a good customer <i>and</i> costs analyst time; worse per
+        unit than a redundant alert</li>
+    <li>The standing blocklist lane blocks <b class="num">891</b> legitimate
+        transactions — counted, shown, future work</li>
+    <li>Across the declared cost grid the trade is roughly break-even at
+        unconstrained optima — the advantage is under capacity constraints,
+        and the corner where it vanishes is named</li>
+  </ul>
+  <div class="src">reports/stage7/episode_table.csv · reports/stage4/episode_cost_grid.csv · C7</div>
+</section>
+
+<!-- 7 · believability -->
+<section class="slide">
+  <p class="kicker">Why any of this is believable</p>
+  <div class="score">
+    <div class="chip">sealed holdout, opened<span class="v">once — 1 log entry</span></div>
+    <div class="chip">pre-registered predictions<span class="v">6 hit / 3 missed<br>all published</span></div>
+    <div class="chip">bugs caught by own checks<span class="v">2 — incl. a 55%<br>self-inflation</span></div>
+    <div class="chip">every comparison<span class="v">paired CIs,<br>chronological splits</span></div>
+  </div>
+  <p class="attr" style="margin-top:4vh">Including the called shot: routing effect predicted
+  1.5–2.8× before unsealing, measured <b class="num g">2.32×</b>.</p>
+  <div class="src">reports/holdout_access.log · reports/holdout_prediction.md · reports/STAGE_7.md</div>
+</section>
+
+<!-- 8 · the offer -->
+<section class="slide">
+  <p class="kicker">The offer</p>
+  <h1 style="font-size:4.6vh">The corrected yardstick: <em>first-strike recall</em> and
+  <em>friction efficiency</em>.<br><br>
+  The system it selects: no entity aggregates, one blocklist KV set as its
+  entire online state, <em>7.84&nbsp;ms p99</em>.<br><br>
+  The one line worth acting on regardless of what you run:
+  <em>route known-bad entities to a blocklist lane before they ever reach
+  the model.</em></h1>
+  <div class="src">ARCHITECTURE.md · reports/stage4/shipped_system_frozen.json</div>
+</section>
+
+<footer class="help">←/→ or space to navigate · F11 for fullscreen</footer>
+<script>
+  const slides = [...document.querySelectorAll('.slide')];
+  let i = 0;
+  const show = n => { slides[i].classList.remove('active');
+    i = (n + slides.length) % slides.length; slides[i].classList.add('active'); };
+  addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') show(i + 1);
+    if (e.key === 'ArrowLeft') show(i - 1);
+  });
+</script>
+</body>
+</html>
