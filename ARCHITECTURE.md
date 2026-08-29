@@ -70,8 +70,10 @@ src/strikeone/
   entity.py       point-in-time entity machinery + UID recipe
   episodes.py     episode roles + friction accounting
   metrics.py      headline metrics, cost model, bootstrap
-  console.py      scoring service + live-counter console (stdlib HTTP)
-  console_static/ the one-page UI
+  audit.py        the corrected evaluation (the product's face)
+  route.py        two-lane routing around any scorer
+  policy_engine.py cost-derived actions in declared ranges
+  cli.py / rpc.py the command line and the TUI's stdio backend
 scripts/          one entry point per stage (stage0_build … stage7_run)
 reports/          STAGE_N.md per stage + committed result artifacts
   holdout_prediction.md   pre-registered ranges, analysis plan, policy
@@ -90,6 +92,7 @@ PROPOSALS.md      every judgment call outside the brief, with status
 | Holdout | `data/processed/holdout.parquet` | sha256 in `data/holdout.sha256`; access log `reports/holdout_access.log` |
 | Raw data | `data/raw/*.csv` (never committed) | sha256 in `data/raw_checksums.sha256` + 3 load-time fingerprints |
 
-The console displays no constant of its own: every figure is computed at
-request time from a replay parquet plus the frozen JSON, which is what
-allows Stage 7 to re-point it at the holdout unchanged.
+Every surface (CLI, TUI, the legacy console in extras/) displays no
+constant of its own: figures are computed at request time from a replay
+parquet plus the frozen JSON, which is what allowed Stage 7 to re-point
+the tooling at the holdout unchanged.

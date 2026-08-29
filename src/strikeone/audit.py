@@ -1,25 +1,24 @@
-"""`strikeone audit` — the corrected evaluation, on anyone's labelled data.
+"""`strikeone audit` — the product's face.
 
-Given transactions + binary labels + an entity key (+ optionally their own
-model's scores), report:
+Point it at labelled transactions and it prints, in this order: what it
+read (honestly, before any result), the number you already have (AP,
+ROC-AUC), the number nobody has (fraud cases stopped on the very first
+attempt, at your review capacity), the gap in one plain sentence, what a
+blocklist gets you for free, one concrete next action, and a footer of
+what was assumed and NOT measured.
 
-  1. episode structure: fraud cases (episodes), first strikes vs later
-     attempts on already-known entities
-  2. how much of the labelled fraud a plain blocklist recovers by itself,
-     given the stated label-availability delay
-  3. if scores are present: headline AP / ROC-AUC, and at each review
-     budget the headline-style recall vs FIRST-STRIKE recall, the
-     redundancy rate, and friction efficiency
-  4. the distortion, stated in their own numbers, in one plain sentence
-
-Everything is computed point-in-time on the chronologically sorted frame
-the contract layer produces. No data leaves the machine.
+The default output is written for a payments ops lead, fits a standard
+terminal, and must stand on its own pasted into Slack with colour
+stripped. Technical detail lives in --verbose and --json. Colour is
+green = prevented, amber = wasted, red = harm, nothing else, and only on
+a TTY without NO_COLOR.
 """
 
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
@@ -29,6 +28,15 @@ from strikeone import episodes
 from strikeone import metrics as M
 
 BUDGET_MENU = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]
+W = 74  # output width: fits a default terminal and a Slack code block
+
+
+def _c(code):
+    return lambda s: f"\x1b[{code}m{s}\x1b[0m"
+
+
+_GREEN, _AMBER, _RED, _BOLD = _c("32;1"), _c("33;1"), _c("31;1"), _c("1")
+_PLAIN = lambda s: s  # noqa: E731
 
 
 @dataclass
@@ -47,54 +55,184 @@ class AuditResult:
             indent=2, default=float,
         )
 
-    def to_text(self) -> str:
-        s, b = self.stats, self.blocklist
-        L = []
-        L.append("STRIKE ONE AUDIT")
-        L.append(f"  {s['rows']:,} transactions over {s['days']:.1f} days; "
-                 f"{s['positives']:,} fraud-labelled ({s['positive_rate']:.2%})")
-        L.append(f"  fraud cases (episodes): {s['episodes']:,}   "
-                 f"first strikes: {s['episodes']:,}   "
-                 f"later attempts on known entities: {s['propagated_rows']:,} "
-                 f"({s['propagated_share_of_positives']:.1%} of fraud rows)")
+    # ---------------------------------------------------------- rendering
+    def to_text(self, color: bool = False, verbose: bool = False) -> str:
+        g, a, r, b = (_GREEN, _AMBER, _RED, _BOLD) if color else (_PLAIN,) * 4
+        s, bl = self.stats, self.blocklist
+        rule = "─" * W
+        L: list[str] = []
+        L.append(b("STRIKE ONE") + "  fraud-operation audit")
+        L.append(rule)
+
+        # a) what was read, honestly, before any result
+        L.append(b("WHAT WAS READ"))
+        L.append(f"  {s['rows']:,} transactions over {s['span_text']}")
+        L.append(f"  {s['positives']:,} labelled fraud "
+                 f"({s['positive_rate']:.2%}); no rows were dropped")
+        res_pct = s["entity_resolution"]
+        if res_pct < 0.95:
+            L.append(f"  the entity key resolves cleanly on {res_pct:.1%} of "
+                     "rows; the rest pool into")
+            L.append("  coarser identities, so every case count below leans "
+                     "conservative")
+        else:
+            L.append(f"  entity key resolves cleanly on {res_pct:.1%} of rows")
+        L.append(f"  fraud labels assumed knowable "
+                 f"{s['label_delay_days']:g} days after the transaction")
         L.append("")
-        L.append("BLOCKLIST RECOVERY (no model at all, "
-                 f"{s['label_delay_days']:g}-day label delay)")
-        L.append(f"  a plain blocklist recovers {b['recovered_rows']:,} of your "
-                 f"fraud rows = {b['recovered_share']:.1%} of labelled fraud, "
-                 f"{b['recovered_amount_share']:.1%} of fraud amount")
-        L.append(f"  it stops 0 fraud cases at the first attempt, "
-                 f"at {b['precision']:.1%} transaction precision")
+
         if self.headline:
             h = self.headline
-            L.append("")
-            L.append("YOUR SCORER, HEADLINE VIEW")
-            L.append(f"  average precision {h['ap']:.4f}   "
+            pr = next(x for x in self.budgets if x["primary"])
+            # b) the number they already have
+            L.append(b("THE NUMBER YOU ALREADY HAVE"))
+            L.append(f"  average precision {h['ap']:.4f}, "
                      f"ROC-AUC {h['roc_auc']:.4f}")
+            if s.get("capacity_stated"):
+                L.append(f"  at your stated {pr['per_day']:,} reviews/day:")
+            else:
+                L.append(f"  at {pr['per_day']:,} reviews/day, inferred from "
+                         "your fraud volume")
+                L.append("  (pass --capacity to use your real number):")
+            L.append(f"  {pr['headline_recall']:.0%} of fraud transactions "
+                     "caught, "
+                     + r(f"{pr['false_positives']:,} good customers flagged"))
             L.append("")
-            L.append("YOUR SCORER, CORRECTED VIEW (per review budget)")
-            L.append("  alerts/day  headline recall  first-strike recall  "
-                      "redundancy  wrongly flagged")
-            for r in self.budgets:
-                mark = "  <- primary" if r["primary"] else ""
-                L.append(f"  {r['per_day']:>9,}  {r['headline_recall']:>14.1%}"
-                         f"  {r['fs_recall']:>18.1%}  {r['redundancy_rate']:>9.1%}"
-                         f"  {r['false_positives']:>15,}{mark}")
-        L.append("")
-        L.append(self.sentence)
+
+            # c) the number nobody has
+            L.append(b("THE NUMBER NOBODY HAS"))
+            L.append("  " + g(f"{pr['fs_recall']:.1%} of fraud CASES stopped "
+                              "on the very first attempt"))
+            L.append(f"  at those same {pr['per_day']:,} reviews/day. That is "
+                     "the only moment a loss")
+            L.append("  is prevented; everything after it, a blocklist "
+                     "catches for free.")
+            L.append("")
+
+            # d) the gap, one plain sentence, their numbers
+            L.append(b("THE GAP, IN YOUR NUMBERS"))
+            for line in _wrap(self.sentence, W - 2):
+                L.append("  " + line)
+            L.append("")
+
+            # e) redundancy + blocklist-recoverable share
+            L.append(b("WHAT A BLOCKLIST GETS YOU FOR FREE"))
+            L.append("  a plain blocklist, no model, recovers "
+                     + a(f"{bl['recovered_share']:.1%}")
+                     + " of your labelled fraud")
+            comp = bl["precision_vs_scorer"]
+            L.append(f"  at {bl['precision']:.1%} precision, while stopping "
+                     + r("0") + " cases on the first attempt.")
+            if comp is not None:
+                L.append("  That precision is "
+                         + (f"{comp:.0%} of" if comp < 1 else "MORE than")
+                         + " your scorer's at the same capacity.")
+            L.append("")
+
+            # f) estimated routing lift + one concrete action
+            L.append(b("ONE THING TO DO NEXT"))
+            freed = pr["alerts_on_flagged_per_day"]
+            if freed >= 0.5:
+                L.append("  routing already-flagged entities to a blocklist "
+                         "lane would free about")
+                L.append("  " + a(f"{freed:.0f} of your {pr['per_day']:,} "
+                                  "reviews/day")
+                         + " for fraud that is actually new.")
+            else:
+                L.append("  at your label maturity, almost none of your "
+                         "reviews land on entities a")
+                L.append("  blocklist could already know; a routing lane "
+                         "would change little here.")
+            L.append("  Measure it on your scorer: strikeone route "
+                     "<your file>")
+            L.append("")
+
+            # the working table, compact
+            L.append(b("AT OTHER REVIEW BUDGETS"))
+            L.append(f"  {'reviews/day':>11} {'txns caught':>11} "
+                     f"{'stopped 1st':>11} {'wasted-on-known':>15} "
+                     f"{'good flagged':>12}")
+            for row in self.budgets:
+                mark = " <-capacity" if row["primary"] else ""
+                L.append(f"  {row['per_day']:>11,} "
+                         f"{row['headline_recall']:>11.1%} "
+                         f"{row['fs_recall']:>11.1%} "
+                         f"{row['redundancy_rate']:>15.1%} "
+                         f"{row['false_positives']:>12,}{mark}")
+            L.append("")
+        else:
+            L.append(b("NO SCORE COLUMN"))
+            for line in _wrap(self.sentence, W - 2):
+                L.append("  " + line)
+            L.append("")
+            L.append(b("WHAT A BLOCKLIST GETS YOU FOR FREE"))
+            L.append("  a plain blocklist, no model, recovers "
+                     + a(f"{bl['recovered_share']:.1%}")
+                     + " of your labelled fraud at")
+            L.append(f"  {bl['precision']:.1%} precision, stopping "
+                     + r("0") + " cases on the first attempt")
+            L.append("")
+
+        if verbose:
+            L.append(b("TECHNICAL (also in --json)"))
+            L.append(f"  fraud cases (episodes): {s['episodes']:,}; later "
+                     f"attempts by known fraudsters: {s['propagated_rows']:,} "
+                     f"({s['propagated_share_of_positives']:.1%} of fraud "
+                     "rows)")
+            L.append(f"  entities: {s['entities']:,}; blocklist-flagged rows "
+                     f"under the delay: {bl['flagged_rows']:,}")
+            if self.budgets:
+                effs = ", ".join(
+                    f"{x['per_day']}/d={x['friction_efficiency']:.1%}"
+                    for x in self.budgets[:6])
+                L.append("  friction efficiency (first-attempt catches per "
+                         f"review): {effs}")
+            L.append("")
+
+        # g) assumed, not measured
+        L.append(rule)
+        L.append(b("ASSUMED, NOT MEASURED"))
+        L.append(f"  fraud labels mature in {s['label_delay_days']:g} days "
+                 "here; slower maturity shrinks")
+        L.append("  every blocklist figure above. Case boundaries come from "
+                 "your entity key;")
+        L.append("  a coarser or finer key moves them. This audit evaluates "
+                 "only the score")
+        L.append("  column you provided: no other model was applied to your "
+                 "traffic, and")
+        L.append("  nothing about your data left this machine.")
         return "\n".join(L)
 
 
-def _budget_grid(n_rows: int, days: float, positives: int) -> tuple[list, int]:
-    grid = [b for b in BUDGET_MENU if b * days <= 0.25 * n_rows]
+def _wrap(text: str, width: int) -> list[str]:
+    words, lines, cur = text.split(), [], ""
+    for w_ in words:
+        if len(cur) + len(w_) + 1 > width:
+            lines.append(cur)
+            cur = w_
+        else:
+            cur = f"{cur} {w_}".strip()
+    if cur:
+        lines.append(cur)
+    return lines
+
+
+def _budget_grid(n_rows: int, days: float, positives: int,
+                 capacity: float | None = None) -> tuple[list, int]:
+    grid = [x for x in BUDGET_MENU if x * days <= 0.25 * n_rows]
     if not grid:
         grid = [max(1, int(0.01 * n_rows / max(days, 1)))]
+    if capacity:
+        cap = int(capacity)
+        if cap not in grid:
+            grid = sorted(set(grid + [cap]))
+        return grid, cap
     per_day_pos = positives / max(days, 1)
-    primary = min(grid, key=lambda b: abs(b - per_day_pos))
-    return grid, primary
+    return grid, min(grid, key=lambda x: abs(x - per_day_pos))
 
 
-def audit(df: pd.DataFrame, label_delay_days: float = 7.0) -> AuditResult:
+def audit(df: pd.DataFrame, label_delay_days: float = 7.0,
+          capacity_per_day: float | None = None) -> AuditResult:
     df = df.sort_values(["t", "transaction_id"]).reset_index(drop=True)
     t = df["t"].to_numpy()
     tb = df["transaction_id"].to_numpy()
@@ -109,23 +247,38 @@ def audit(df: pd.DataFrame, label_delay_days: float = 7.0) -> AuditResult:
     prop = roles == episodes.ROLE_PROPAGATED
     n_eps = int(fs.sum())
 
-    bl = ent_mod.pit_delayed_label_stats(
+    bl_stats = ent_mod.pit_delayed_label_stats(
         pd.Series(ent), t.astype(np.int64), y, tb,
         delay_days=label_delay_days, prefix="e",
     )
-    flag = np.nan_to_num(bl["e_fraud_rate"].to_numpy()) > 0
+    flag = np.nan_to_num(bl_stats["e_fraud_rate"].to_numpy()) > 0
     rec_rows = int((flag & (y == 1)).sum())
     rec_amt = float(amt[flag & (y == 1)].sum())
     pos_amt = float(amt[y == 1].sum())
 
+    # real dates only when timestamps are plausibly epoch seconds
+    if t.min() > 3e8:
+        d0 = datetime.fromtimestamp(t.min(), tz=timezone.utc).date()
+        d1 = datetime.fromtimestamp(t.max(), tz=timezone.utc).date()
+        span_text = f"{days:.0f} days ({d0} to {d1})"
+    else:
+        span_text = f"{days:.1f} days (relative timestamps)"
+
+    resolution = float(1 - pd.Series(ent).astype(str)
+                       .str.contains("nan").mean())
+
     stats = {
-        "rows": n, "days": days, "positives": pos,
-        "positive_rate": pos / n,
+        "rows": n, "days": days, "span_text": span_text,
+        "positives": pos, "positive_rate": pos / n,
         "episodes": n_eps,
         "propagated_rows": int(prop.sum()),
-        "propagated_share_of_positives": float(prop.sum() / pos) if pos else 0.0,
+        "propagated_share_of_positives":
+            float(prop.sum() / pos) if pos else 0.0,
         "label_delay_days": label_delay_days,
         "entities": int(pd.Series(ent).nunique()),
+        "entity_resolution": resolution,
+        "rows_dropped": 0,
+        "capacity_stated": capacity_per_day is not None,
     }
     blocklist = {
         "flagged_rows": int(flag.sum()),
@@ -133,6 +286,7 @@ def audit(df: pd.DataFrame, label_delay_days: float = 7.0) -> AuditResult:
         "recovered_share": rec_rows / pos if pos else 0.0,
         "recovered_amount_share": rec_amt / pos_amt if pos_amt else 0.0,
         "precision": float(y[flag].mean()) if flag.any() else 0.0,
+        "precision_vs_scorer": None,
         "first_strike_catches": int((flag & fs).sum()),
     }
 
@@ -142,7 +296,7 @@ def audit(df: pd.DataFrame, label_delay_days: float = 7.0) -> AuditResult:
         s = df["score"].fillna(-np.inf).to_numpy(dtype=float)
         res.headline = {"ap": M.average_precision(y, s),
                         "roc_auc": M.roc_auc(y, s)}
-        grid, primary = _budget_grid(n, days, pos)
+        grid, primary = _budget_grid(n, days, pos, capacity_per_day)
         for per_day in grid:
             budget = int(per_day * days)
             alert = M.alerts_at_budget(s, budget)
@@ -156,25 +310,31 @@ def audit(df: pd.DataFrame, label_delay_days: float = 7.0) -> AuditResult:
                 "fs_recall": fs_c / n_eps if n_eps else 0.0,
                 "redundancy_rate": red / on_pos if on_pos else 0.0,
                 "friction_efficiency": fs_c / budget if budget else 0.0,
+                "precision": on_pos / budget if budget else 0.0,
+                "alerts_on_flagged_per_day":
+                    float((alert & flag).sum() / max(days, 1)),
                 "primary": per_day == primary,
             })
-        pr = next(r for r in res.budgets if r["primary"])
+        pr = next(x for x in res.budgets if x["primary"])
+        if pr["precision"] > 0:
+            blocklist["precision_vs_scorer"] = (
+                blocklist["precision"] / pr["precision"])
+        n_red = int(round(pr["redundancy_rate"]
+                          * pr["headline_recall"] * pos))
         res.sentence = (
-            f"THE GAP: at {pr['per_day']:,} alerts/day your scorer reports "
-            f"{pr['headline_recall']:.0%} recall, but only "
-            f"{pr['fs_recall']:.0%} of fraud cases are stopped at their first "
-            f"attempt, and {pr['redundancy_rate']:.0%} of its correct alerts "
-            f"are later attempts by fraudsters already detected in this "
-            f"window. The difference is what your headline metric is "
-            f"over-crediting."
+            f"{n_red:,} of the alerts your metric counts as wins were later "
+            f"attempts by fraudsters already caught in this window. Those "
+            f"prevented nothing. Counted by fraud cases stopped on the "
+            f"first attempt, you stop {pr['fs_recall']:.0%}; your headline "
+            f"number reads {pr['headline_recall']:.0%}."
         )
     else:
         res.sentence = (
-            f"Without a score column this audit reports label structure only: "
-            f"{blocklist['recovered_share']:.0%} of your labelled fraud sits "
-            f"on entities a {label_delay_days:g}-day blocklist already knows, "
-            f"so any transaction-level metric can be up to that share "
-            f"'right' without preventing anything. Re-run with "
-            f"--map score=<your model column> to measure your own gap."
+            f"No score column was mapped, so this reads your label "
+            f"structure only: {blocklist['recovered_share']:.0%} of your "
+            f"labelled fraud sits on entities a {label_delay_days:g}-day "
+            f"blocklist already knows, meaning a transaction-level metric "
+            f"can be that share 'right' while preventing nothing. Re-run "
+            f"with --map score=<your model column> to measure your own gap."
         )
     return res

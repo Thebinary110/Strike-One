@@ -6,7 +6,7 @@ replay parquet (built by scripts/stage6_prepare_replay.py) and the frozen
 Stage 4 config. Nothing is hardcoded in the UI: Stage 7 points --data at a
 holdout-derived file and the same console reports holdout numbers.
 
-Run: uv run python -m strikeone.console [--data PATH] [--port 8777]
+Run: uv run python extras/console/console.py [--data PATH] [--port 8777]
 """
 
 from __future__ import annotations

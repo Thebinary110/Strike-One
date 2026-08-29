@@ -4,7 +4,7 @@
 `reports/stage7/canonical_comparisons.md` (IDs in brackets, not spoken).
 Holdout numbers only, except one sentence of validation for the
 replication point [C3v]. Frames for beats 1–3 and 5 are in
-`video/slides.html`; beats with live assets use the console and repo.
+`video/slides.html`; beats with live assets use the TUI and repo.
 
 ---
 
@@ -29,8 +29,8 @@ replication point [C3v]. Frames for beats 1–3 and 5 are in
 
 ## 0:50–1:25 · The mechanism — SLIDE 2, then the entity timeline
 
-(Console open on `--data data/processed/holdout_replay.parquet`, "show a
-real episode" clicked, for the timeline shot.)
+(TUI CASE tab on the worked example, "next case" pressed, for the
+timeline shot.)
 
 > The labels weren't assigned per transaction. Once a card is charged
 > back, every later transaction sharing its account, email, or billing
@@ -165,7 +165,7 @@ labels and find out.
 
 ## Recording checklist
 
-- [ ] Console pre-pointed at `holdout_replay.parquet`; slider/toggle moves
+- [ ] TUI pre-loaded on the worked example; tab and budget key moves
       rehearsed to muscle memory; one unbroken ~75s take
 - [ ] Every slide frame carries its source path in the corner (baked into
       `video/slides.html`)

@@ -6,7 +6,11 @@ import json
 import pandas as pd
 import pytest
 
-from strikeone.console import Replay
+import sys
+from pathlib import Path as _P
+
+sys.path.insert(0, str(_P(__file__).parent))
+from console import Replay  # noqa: E402
 
 
 @pytest.fixture

@@ -18,10 +18,71 @@ anywhere in the package.
 
 ```bash
 pip install -e .                      # or: uv sync
-strikeone check --example ieee-cis    # validate the worked example
-strikeone audit --example ieee-cis    # the corrected evaluation, live
-strikeone tui                         # the terminal UI (Node 18+)
+strikeone audit --example ieee-cis
 ```
+
+The output is the product. On the worked example, verbatim:
+
+```text
+STRIKE ONE  fraud-operation audit
+──────────────────────────────────────────────────────────────────────────
+WHAT WAS READ
+  92,427 transactions over 32.0 days (relative timestamps)
+  3,213 labelled fraud (3.48%); no rows were dropped
+  the entity key resolves cleanly on 89.5% of rows; the rest pool into
+  coarser identities, so every case count below leans conservative
+  fraud labels assumed knowable 7 days after the transaction
+
+THE NUMBER YOU ALREADY HAVE
+  average precision 0.4849, ROC-AUC 0.8553
+  at 100 reviews/day, inferred from your fraud volume
+  (pass --capacity to use your real number):
+  47% of fraud transactions caught, 1,676 good customers flagged
+
+THE NUMBER NOBODY HAS
+  54.0% of fraud CASES stopped on the very first attempt
+  at those same 100 reviews/day. That is the only moment a loss
+  is prevented; everything after it, a blocklist catches for free.
+
+THE GAP, IN YOUR NUMBERS
+  733 of the alerts your metric counts as wins were later attempts by
+  fraudsters already caught in this window. Those prevented nothing.
+  Counted by fraud cases stopped on the first attempt, you stop 54%; your
+  headline number reads 47%.
+
+WHAT A BLOCKLIST GETS YOU FOR FREE
+  a plain blocklist, no model, recovers 12.9% of your labelled fraud
+  at 73.0% precision, while stopping 0 cases on the first attempt.
+  That precision is MORE than your scorer's at the same capacity.
+
+ONE THING TO DO NEXT
+  routing already-flagged entities to a blocklist lane would free about
+  1 of your 100 reviews/day for fraud that is actually new.
+  Measure it on your scorer: strikeone route <your file>
+
+AT OTHER REVIEW BUDGETS
+  reviews/day txns caught stopped 1st wasted-on-known good flagged
+            1        1.0%        1.6%           25.8%            0
+            2        2.0%        2.7%           38.1%            0
+            5        4.9%        6.1%           43.3%            2
+           10        9.6%       11.7%           44.3%           12
+           20       18.2%       21.9%           45.2%           55
+           50       36.2%       44.0%           44.6%          437
+          100       47.4%       54.0%           48.1%        1,676 <-capacity
+          200       57.8%       62.9%           50.4%        4,543
+          500       72.7%       77.5%           51.5%       13,662
+
+──────────────────────────────────────────────────────────────────────────
+ASSUMED, NOT MEASURED
+  fraud labels mature in 7 days here; slower maturity shrinks
+  every blocklist figure above. Case boundaries come from your entity key;
+  a coarser or finer key moves them. This audit evaluates only the score
+  column you provided: no other model was applied to your traffic, and
+  nothing about your data left this machine.
+```
+
+`strikeone check` validates your file first; `strikeone tui` is the
+terminal UI (Node 18+).
 
 No pipeline outputs built yet? `--example synthetic` runs instantly on
 generated data (clearly labelled as such; the repo never vendors dataset
@@ -208,7 +269,7 @@ cost (891 legitimate transactions blocked by that standing policy —
 counted, shown, future work). **B−A first-strike recall on holdout:
 −0.0192 [−0.0326, −0.0052]** — the headline winner is again significantly
 worse at prevention. Retraining cadence is worth **+0.068 AP**
-(primary → secondary). The console reproduces every counter from
+(primary → secondary). The replay tooling reproduces every counter from
 `holdout_replay.parquet` — the same swapped-parquet path proven in
 Stage 6.
 
@@ -236,7 +297,7 @@ Showing this reasoning beats manufacturing a null we can already derive.
 ```bash
 uv sync                          # pinned environment (uv.lock)
 bash scripts/download_data.sh    # fetch + checksum-verify the public dataset
-uv run pytest                    # unit tests (metrics, episodes, seal, console)
+uv run pytest                    # unit tests (contract, audit, metrics, seal)
 uv run python scripts/stage0_build.py        # ingest, split, seal holdout
 uv run python scripts/stage1_baseline_a.py   # Baseline A (frozen)
 uv run python scripts/stage1_leak_table.py   # the 2x2 leakage table
@@ -246,8 +307,7 @@ uv run python scripts/stage3_episode_analysis.py  # episode/friction tables
 uv run python scripts/stage4_lane2.py        # lane-2 retrain (A2)
 uv run python scripts/stage4_policy.py       # decision engine + freeze
 uv run python scripts/stage4_episode_cost.py # episode-aware pricing
-uv run python scripts/stage6_prepare_replay.py    # console replay file
-uv run python -m strikeone.console           # -> http://127.0.0.1:8777
+uv run python scripts/stage6_prepare_replay.py    # worked-example replay file
 # Stage 7 (already executed once; the run script refuses a second unseal):
 #   uv run python scripts/stage7_prepare.py
 #   uv run python scripts/stage7_run.py
@@ -256,9 +316,6 @@ uv run python -m strikeone.console           # -> http://127.0.0.1:8777
 All randomness is seeded (`strikeone.config.SEED`). Runs on a laptop CPU;
 no cloud, no GPU. Clean-clone reproduction is verified through
 `stage0_build` (byte-identical holdout hash) and the full test suite.
-The optional web console (`strikeone console`, a self-contained stdlib
-server) remains as an extra surface; the package and the TUI are the
-product.
 
 ## Data: source, faithfulness, licensing
 
@@ -296,8 +353,8 @@ hosting and verify integrity.
 
 - `src/strikeone/` — the package: contract + mapping (`contract.py`),
   `audit`, `route`, `policy_engine`, `cli`, `rpc` (the TUI's backend),
-  plus the evaluation core (metrics, episodes, entity, seal) and the
-  optional web console; see `ARCHITECTURE.md`
+  plus the evaluation core (metrics, episodes, entity, seal); see
+  `ARCHITECTURE.md`
 - `tui/` — the Ink terminal UI (TypeScript; a surface, never a dependency
   of the core)
 - `examples/` — mapping examples: IEEE-CIS and a PSP-shaped disputes

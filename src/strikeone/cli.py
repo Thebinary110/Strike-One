@@ -93,19 +93,23 @@ def cmd_audit(args) -> int:
     if not rep.ok:
         print(rep.to_text(), file=sys.stderr)
         return 2
-    res = audit_mod.audit(df, label_delay_days=m.label_delay_days)
-    print(res.to_json() if args.json else res.to_text())
+    if len(df) > 300_000 and sys.stderr.isatty():
+        print(f"auditing {len(df):,} rows; this can take ~10s ...",
+              file=sys.stderr)
+    res = audit_mod.audit(df, label_delay_days=m.label_delay_days,
+                          capacity_per_day=args.capacity)
+    color = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+    print(res.to_json() if args.json
+          else res.to_text(color=color, verbose=args.verbose))
     if args.example == "synthetic" and not args.json:
         print("\n(synthetic demonstration data; run against your own file "
               "with --map, or the frozen IEEE-CIS worked example)")
     if args.example == "ieee-cis" and not args.json:
-        print("\n(the audit treats this file as a standalone window, exactly "
-              "as it would treat your export: entity history outside the "
-              "file does not exist for the tool. The frozen stage reports "
-              "in reports/ evaluate the same window with the full 182-day "
-              "stream behind it, so their episode counts differ, "
-              "legitimately: 1,198 episodes there vs the within-window "
-              "count here.)")
+        print("\nnote: this file is audited as a standalone window, exactly "
+              "as your export\nwould be. The frozen stage reports evaluate "
+              "the same window with the full\n182-day stream behind it, so "
+              "episode counts differ (1,198 there vs the\nwithin-window "
+              "count here), legitimately.")
     return 0
 
 
@@ -154,13 +158,6 @@ def cmd_tui(args) -> int:
                             *args.rest], env=env, cwd=str(tui_dir))
 
 
-def cmd_console(args) -> int:
-    from strikeone import console
-    sys.argv = ["strikeone-console"] + args.rest
-    console.main()
-    return 0
-
-
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(
         prog="strikeone",
@@ -182,6 +179,13 @@ def main(argv=None) -> None:
         p = sub.add_parser(name, help=doc)
         _add_source_args(p)
         p.set_defaults(fn=fn)
+        if name == "audit":
+            p.add_argument("--capacity", type=float, default=None,
+                           help="your review capacity, alerts/day (otherwise "
+                                "inferred from your fraud volume)")
+            p.add_argument("--verbose", action="store_true",
+                           help="add the technical block (episodes, friction "
+                                "efficiency)")
         if name == "route":
             p.add_argument("--blocklist",
                            help="file of known-bad entity ids, one per line "
@@ -201,10 +205,6 @@ def main(argv=None) -> None:
     p = sub.add_parser("tui", help="terminal UI (Ink; needs Node 18+)")
     p.add_argument("rest", nargs="*")
     p.set_defaults(fn=cmd_tui)
-    p = sub.add_parser("console", help="the optional web console (demoted "
-                                       "extra; the TUI is the surface)")
-    p.add_argument("rest", nargs="*")
-    p.set_defaults(fn=cmd_console)
 
     args = ap.parse_args(argv)
     try:

@@ -84,7 +84,7 @@ def test_audit_hand_numbers():
     assert r.blocklist["recovered_rows"] == 1
     assert r.blocklist["first_strike_catches"] == 0
     assert r.headline["ap"] > 0.9  # scores rank frauds on top here
-    assert "GAP" in r.sentence or "blocklist" in r.sentence
+    assert "first attempt" in r.sentence
 
 
 def test_route_lift_and_lane1():
