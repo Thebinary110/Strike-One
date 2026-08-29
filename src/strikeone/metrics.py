@@ -10,7 +10,7 @@ abandonment rate), e (step-up efficacy), c_h (chargeback handling cost):
 
     action    fraud (y=1)          legit (y=0)
     approve   A + c_h              0
-    step-up   (1-e) * (A + c_h)    a * m * A
+    step-up   (1-e)*(1-s)*(A+c_h)  a * m * A
     block     0                    m * A
 
 Expected cost under calibrated probability p is the y-expectation of the
@@ -112,6 +112,12 @@ class CostParams:
     a: float      # step-up abandonment rate
     e: float      # step-up efficacy against a fraud attempt
     c_h: float    # chargeback handling cost (same currency unit as amounts)
+    s: float = 0.0  # liability shifted to the issuer on a SUCCESSFUL
+    #               step-up authentication (3DS/OTP), s in [0, 1].
+    #               Default 0 keeps the shipped frozen policy bit-identical.
+    #               India caveat: RBI's authentication directions mandate
+    #               AFA domestically, so liability-shift dynamics differ
+    #               from markets where 3DS is optional. Stated, not modelled.
 
 
 def realized_cost(y_true, action, amount, p: CostParams) -> np.ndarray:
@@ -125,7 +131,7 @@ def realized_cost(y_true, action, amount, p: CostParams) -> np.ndarray:
         raise ValueError("unknown action code")
     cost[is_ap] = y[is_ap] * (A[is_ap] + p.c_h)
     cost[is_su] = (
-        y[is_su] * (1 - p.e) * (A[is_su] + p.c_h)
+        y[is_su] * (1 - p.e) * (1 - p.s) * (A[is_su] + p.c_h)
         + (1 - y[is_su]) * p.a * p.m * A[is_su]
     )
     cost[is_bl] = (1 - y[is_bl]) * p.m * A[is_bl]
@@ -137,7 +143,8 @@ def expected_cost_matrix(p_fraud, amount, p: CostParams) -> np.ndarray:
     pf = np.asarray(p_fraud, dtype=float)
     A = np.asarray(amount, dtype=float)
     approve = pf * (A + p.c_h)
-    stepup = pf * (1 - p.e) * (A + p.c_h) + (1 - pf) * p.a * p.m * A
+    stepup = (pf * (1 - p.e) * (1 - p.s) * (A + p.c_h)
+              + (1 - pf) * p.a * p.m * A)
     block = (1 - pf) * p.m * A
     return np.stack([approve, stepup, block], axis=1)
 

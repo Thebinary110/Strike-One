@@ -186,3 +186,63 @@ def test_history_reclassifies_prewindow_cases():
     assert r1.blocklist["recovered_rows"] == r0.blocklist["recovered_rows"] + 1
     assert "plus your supplied history" in r1.to_text()
     assert "upper bound" in r0.to_text()
+
+
+def test_liability_shift_default_preserves_frozen_policy():
+    # s defaults to 0: expected costs, realized costs, and the frozen
+    # config (which predates s and omits it) are bit-identical to before
+    import json
+    import numpy as np
+    from strikeone import metrics as M
+
+    rng = np.random.default_rng(3)
+    p_, A_ = rng.random(500), rng.gamma(2, 60, 500)
+    old_stepup = p_ * (1 - 0.775) * (A_ + 30.0) + (1 - p_) * 0.125 * 0.15 * A_
+    prm0 = M.CostParams(m=0.15, a=0.125, e=0.775, c_h=30.0)  # s omitted
+    assert prm0.s == 0.0
+    ec = M.expected_cost_matrix(p_, A_, prm0)
+    assert np.allclose(ec[:, 1], old_stepup)
+    # the frozen Stage 4 config (no 's' key) must still construct cleanly
+    frozen = {"m": 0.15, "a": 0.125, "e": 0.775, "c_h": 30.0}
+    assert M.CostParams(**frozen).s == 0.0
+    # and s > 0 strictly cheapens step-up on frauds, nothing else
+    prm1 = M.CostParams(m=0.15, a=0.125, e=0.775, c_h=30.0, s=1.0)
+    ec1 = M.expected_cost_matrix(p_, A_, prm1)
+    assert np.all(ec1[:, 1] <= ec[:, 1])
+    assert np.allclose(ec1[:, 0], ec[:, 0]) and np.allclose(ec1[:, 2], ec[:, 2])
+
+
+def test_policy_s_dimension_clamped_and_swept():
+    df, _ = mapped()
+    df = df.assign(p=[0.01, 0.9, 0.8, 0.7, 0.02, 0.01])
+    r = policy(df, {"s": 5})
+    assert r.params["s"] == 1.0            # clamped to the declared range
+    assert any(g["s"] > 0 for g in r.grid)  # the sweep explores s > 0
+
+
+def test_stickiness_gates_the_headline():
+    # sticky labels (the standard fixture): e1's later fraud follows an
+    # earlier one -> stickiness = P(y|prior)/base = 1.0/0.5 = 2.0 -> headline
+    df, _ = mapped()
+    r = audit(df, label_delay_days=7.0)
+    assert r.stats["stickiness"] == pytest.approx(2.0)
+    assert r.stats["labels_propagate"]
+    assert "THE NUMBER NOBODY HAS" in r.to_text()
+
+    # independent labels: each entity frauds at most once, never after a
+    # prior fraud -> stickiness 0 -> refuse the first-hit headline
+    f = frame().assign(bad=[0, 1, 0, 1, 1, 0])
+    m = contract.Mapping(
+        columns={"transaction_id": "txid", "timestamp": "when",
+                 "amount": "amt", "entity": ["who"], "label": "bad",
+                 "score": "s"},
+        label_delay_days=7.0, source="test")
+    r2 = audit(contract.apply_mapping(f, m), label_delay_days=7.0)
+    assert not r2.stats["labels_propagate"]
+    txt = r2.to_text()
+    assert "ORDINARY RECALL" in txt
+    assert "THE NUMBER NOBODY HAS" not in txt
+
+    rep = contract.check(contract.apply_mapping(f, m), m)
+    assert any("entity-independent" in w or "not be headlined" in w
+               for w in rep.warnings)

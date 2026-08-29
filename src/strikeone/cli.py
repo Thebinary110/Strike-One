@@ -147,7 +147,7 @@ def cmd_route(args) -> int:
 def cmd_policy(args) -> int:
     df, m = _load(args)
     params = {}
-    for k in ("m", "a", "e", "c_h"):
+    for k in ("m", "a", "e", "c_h", "s"):
         v = getattr(args, k if k != "c_h" else "ch")
         if v is not None:
             params[k] = v
@@ -229,6 +229,12 @@ def main(argv=None) -> None:
                            "(0.60-0.95)")
             p.add_argument("--ch", type=float, help="chargeback handling "
                            "cost, amount units (15-60)")
+            p.add_argument("--s", type=float,
+                           help="liability shifted to the issuer on a "
+                                "successful step-up authentication (0-1; "
+                                "default 0 = the frozen policy). India "
+                                "caveat: RBI mandates AFA domestically, so "
+                                "shift dynamics differ; stated, not modelled")
             p.add_argument("--out", help="write recommendations to CSV")
 
     sub.add_parser("tui", help="terminal UI (Ink; needs Node 18+); "

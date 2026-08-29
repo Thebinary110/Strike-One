@@ -28,6 +28,29 @@ from strikeone import episodes
 from strikeone import metrics as M
 
 BUDGET_MENU = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]
+STICKINESS_THRESHOLD = 2.0
+# First-hit metrics are only meaningful when labels PROPAGATE across an
+# entity. stickiness = P(label=1 | same entity has an earlier label=1)
+# divided by the base rate. Threshold 2.0: knowing an entity's past fraud
+# must at least double the label rate for episode structure to carry
+# signal; at ~1 the labels are entity-independent and first-hit recall
+# collapses to ordinary recall. The value is always reported so a user
+# can judge the threshold themselves.
+
+
+def label_stickiness(ent, t, y, tb) -> float | None:
+    """P(label | earlier label on the same entity) / base rate.
+
+    Point-in-time: 'earlier' means earlier in (t, tiebreak) order.
+    None when no row has an entity with an earlier positive (undefined).
+    """
+    d = pd.DataFrame({"e": ent, "t": t, "tb": tb, "y": np.asarray(y)})
+    d = d.sort_values(["t", "tb"])
+    prior = (d.groupby("e", sort=False)["y"].cumsum() - d["y"]) > 0
+    base = float(d["y"].mean())
+    if not prior.any() or base == 0:
+        return None
+    return float(d.loc[prior, "y"].mean() / base)
 W = 74  # output width: fits a default terminal and a Slack code block
 
 
@@ -79,6 +102,16 @@ class AuditResult:
             L.append(f"  entity key resolves cleanly on {res_pct:.1%} of rows")
         L.append(f"  fraud labels assumed knowable "
                  f"{s['label_delay_days']:g} days after the transaction")
+        st = s.get("stickiness")
+        if st is None:
+            L.append("  label stickiness: undefined (no entity repeats "
+                     "after a fraud)")
+        else:
+            verdict = ("labels propagate across entities"
+                       if s.get("labels_propagate")
+                       else "labels look entity-independent")
+            L.append(f"  label stickiness: {st:.1f}x the base rate "
+                     f"({verdict})")
         if s.get("history_supplied"):
             L.append(f"  prior-window history supplied: "
                      f"{s['history_entities']:,} flagged entities; "
@@ -104,14 +137,32 @@ class AuditResult:
                      + r(f"{pr['false_positives']:,} good customers flagged"))
             L.append("")
 
-            # c) the number nobody has
-            L.append(b("THE NUMBER NOBODY HAS"))
-            L.append("  " + g(f"{pr['fs_recall']:.1%} of fraud CASES caught "
-                              "at their first labelled transaction"))
-            L.append(f"  at those same {pr['per_day']:,} reviews/day. "
-                     "Everything after a case's first")
-            L.append("  transaction, a standing blocklist would also have "
-                     "covered.")
+            # c) the number nobody has - ONLY when labels propagate.
+            # On entity-independent labels first-hit recall collapses to
+            # ordinary recall and has nothing to add; refusing to headline
+            # it is the honest answer on data unlike the worked example.
+            if s.get("labels_propagate"):
+                L.append(b("THE NUMBER NOBODY HAS"))
+                L.append("  " + g(f"{pr['fs_recall']:.1%} of fraud CASES "
+                                  "caught at their first labelled "
+                                  "transaction"))
+                L.append(f"  at those same {pr['per_day']:,} reviews/day. "
+                         "Everything after a case's first")
+                L.append("  transaction, a standing blocklist would also "
+                         "have covered.")
+            else:
+                L.append(b("THE HEADLINE ON THIS DATA IS ORDINARY RECALL"))
+                L.append(f"  {pr['headline_recall']:.1%} of fraud "
+                         f"transactions caught at {pr['per_day']:,} "
+                         "reviews/day.")
+                stv = f"{st:.1f}x" if st is not None else "undefined"
+                L.append(f"  Your labels do not propagate across entities "
+                         f"(stickiness {stv}, threshold")
+                L.append(f"  {STICKINESS_THRESHOLD:g}x), so first-hit "
+                         "recall would collapse to ordinary recall and")
+                L.append("  the corrected metric has nothing to add on this "
+                         "data. First-hit numbers")
+                L.append("  stay in the table and --json for completeness.")
             L.append("")
 
             # d) where the budget went: the honest single-system framing
@@ -317,6 +368,7 @@ def audit(df: pd.DataFrame, label_delay_days: float = 7.0,
 
     resolution = float(1 - pd.Series(ent).astype(str)
                        .str.contains("nan").mean())
+    stickiness = label_stickiness(ent, t, y, tb)
 
     stats = {
         "rows": n, "days": days, "span_text": span_text,
@@ -331,6 +383,9 @@ def audit(df: pd.DataFrame, label_delay_days: float = 7.0,
         "rows_dropped": 0,
         "capacity_stated": capacity_per_day is not None,
         "capacity_default": DEFAULT_CAPACITY,
+        "stickiness": stickiness,
+        "labels_propagate": (stickiness is not None
+                             and stickiness >= STICKINESS_THRESHOLD),
         "history_supplied": history_entities is not None,
         "history_entities": len(history_entities) if history_entities else 0,
         "cases_reclassified": cases_reclassified,

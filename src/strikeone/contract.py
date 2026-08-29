@@ -271,6 +271,24 @@ def check(df: pd.DataFrame, m: Mapping, for_audit: bool = True) -> CheckReport:
             )
         stats["label_delay_days"] = m.label_delay_days
 
+    if for_audit and "label" in df.columns and not df["label"].isna().any():
+        from strikeone.audit import STICKINESS_THRESHOLD, label_stickiness
+        st = label_stickiness(df["entity"].to_numpy(), df["t"].to_numpy(),
+                              df["label"].to_numpy().astype(int),
+                              df["transaction_id"].to_numpy())
+        if st is None:
+            stats["label_stickiness"] = "undefined (no entity repeats after a fraud)"
+            warnings.append("labels never repeat within an entity; first-hit "
+                            "metrics will not be headlined")
+        else:
+            stats["label_stickiness"] = f"{st:.1f}x base rate"
+            if st < STICKINESS_THRESHOLD:
+                warnings.append(
+                    f"label stickiness {st:.1f}x is below "
+                    f"{STICKINESS_THRESHOLD:g}x: labels look "
+                    "entity-independent, so the audit will headline "
+                    "ordinary recall, not first-hit recall")
+
     if "score" in df.columns:
         sn = df["score"].isna().mean()
         if sn > 0.05:

@@ -19,8 +19,14 @@ import pandas as pd
 from strikeone import metrics as M
 
 DECLARED_RANGES = {"m": [0.05, 0.15, 0.25], "a": [0.05, 0.125, 0.20],
-                   "e": [0.60, 0.775, 0.95], "c_h": [15.0, 30.0, 60.0]}
-CENTRAL = {"m": 0.15, "a": 0.125, "e": 0.775, "c_h": 30.0}
+                   "e": [0.60, 0.775, 0.95], "c_h": [15.0, 30.0, 60.0],
+                   "s": [0.0, 0.5, 1.0]}
+CENTRAL = {"m": 0.15, "a": 0.125, "e": 0.775, "c_h": 30.0, "s": 0.0}
+# s = liability shifted to the issuer on successful step-up authentication.
+# DEFAULT 0: the shipped policy at default is bit-identical to the frozen
+# config (asserted by test). The sweep explores s > 0; it never changes the
+# shipped default. India caveat: RBI mandates AFA domestically, so
+# liability-shift dynamics differ from optional-3DS markets. Stated only.
 
 
 @dataclass
@@ -44,6 +50,8 @@ class PolicyResult:
         L.append(f"  economics: margin {p['m']:.0%}, abandonment {p['a']:.1%}, "
                  f"step-up efficacy {p['e']:.0%}, chargeback handling "
                  f"{p['c_h']:g} (amount units)")
+        if p.get("s", 0):
+            L.append(f"  liability shift on successful step-up: {p['s']:.0%}")
         m = self.mix
         L.append(f"  recommended mix: approve {m['pct'][0]:.1f}%  "
                  f"ask-to-verify {m['pct'][1]:.1f}%  block {m['pct'][2]:.1f}%")
@@ -56,7 +64,8 @@ class PolicyResult:
         if self.worst_corner:
             w = self.worst_corner
             L.append(f"  honest corner: at m={w['m']}, a={w['a']}, e={w['e']}, "
-                     f"c_h={w['c_h']} the cost-derived policy's edge over a "
+                     f"c_h={w['c_h']}, s={w.get('s', 0)} the cost-derived "
+                     "policy's edge over a "
                      f"fixed threshold is {w['edge_vs_fixed']:+.2%} of "
                      "approve-all cost, its weakest point in the declared "
                      "ranges. Shown, not hidden.")
@@ -118,15 +127,15 @@ def policy(df: pd.DataFrame, params: dict | None = None,
         if not grid:
             return res
         worst = None
-        for m_, a_, e_, ch_ in itertools.product(*DECLARED_RANGES.values()):
-            pr = M.CostParams(m=m_, a=a_, e=e_, c_h=ch_)
+        for m_, a_, e_, ch_, s_ in itertools.product(*DECLARED_RANGES.values()):
+            pr = M.CostParams(m=m_, a=a_, e=e_, c_h=ch_, s=s_)
             eci = M.expected_cost_matrix(pcol, amt, pr)
             ai = eci.argmin(axis=1)
             ci = float(M.realized_cost(y, ai, amt, pr).sum())
             cf = fixed_cost(pr)
             ca = float(M.realized_cost(y, np.zeros(len(y)), amt, pr).sum())
             edge = (cf - ci) / ca if ca else 0.0
-            res.grid.append({"m": m_, "a": a_, "e": e_, "c_h": ch_,
+            res.grid.append({"m": m_, "a": a_, "e": e_, "c_h": ch_, "s": s_,
                              "cost_policy": ci, "cost_fixed": cf,
                              "edge_vs_fixed": edge})
             if worst is None or edge < worst["edge_vs_fixed"]:
