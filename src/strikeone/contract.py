@@ -244,8 +244,15 @@ def check(df: pd.DataFrame, m: Mapping, for_audit: bool = True) -> CheckReport:
                 errors.append(f"label must be binary 0/1; found values "
                               f"{sorted(vals)[:6]}")
             elif df["label"].isna().any():
-                errors.append(f"{int(df['label'].isna().sum())} rows have a "
-                              "missing label")
+                n_bad = int(df["label"].isna().sum())
+                if n_bad > 0.5 * n:
+                    errors.append(
+                        f"label column is not numeric for {n_bad} rows; "
+                        "map a binary 0/1 column (derive one first if your "
+                        "export has status strings)"
+                    )
+                else:
+                    errors.append(f"{n_bad} rows have a missing label")
             else:
                 stats["positives"] = int(df["label"].sum())
                 stats["positive_rate"] = f"{df['label'].mean():.2%}"

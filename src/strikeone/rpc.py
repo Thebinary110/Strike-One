@@ -35,11 +35,28 @@ class Session:
         if p.get("example"):
             raw, m = examples.resolve(p["example"])
         else:
-            m = contract.Mapping(
-                columns=p.get("map", {}),
-                label_delay_days=float(p.get("delay", 7.0)),
-                source=p["source"],
-            )
+            from pathlib import Path as _P
+            if p.get("map"):
+                m = contract.Mapping(
+                    columns=p["map"],
+                    label_delay_days=float(p.get("delay", 7.0)),
+                    source=p["source"],
+                )
+            else:
+                # honour the persisted mapping, next to the source or in cwd
+                for cand in (_P(p["source"]).parent / contract.CONFIG_FILE,
+                             _P(contract.CONFIG_FILE)):
+                    if cand.exists():
+                        m = contract.Mapping.load(cand)
+                        m.source = p["source"]
+                        break
+                else:
+                    raise RuntimeError(
+                        "no column mapping found: create one with "
+                        "`strikeone check <file> --map ... --save-config` "
+                        "(looked for .strikeone.toml beside the file and "
+                        "in the working directory)"
+                    )
             raw = contract.read_source(p["source"], query=p.get("query"),
                                        table=p.get("table"))
         if p.get("delay") is not None:

@@ -1,0 +1,23 @@
+STRIKE ONE AUDIT
+  165,759 transactions over 119.5 days; 479 fraud-labelled (0.29%)
+  fraud cases (episodes): 52   first strikes: 52   later attempts on known entities: 427 (89.1% of fraud rows)
+
+BLOCKLIST RECOVERY (no model at all, 30-day label delay)
+  a plain blocklist recovers 0 of your fraud rows = 0.0% of labelled fraud, 0.0% of fraud amount
+  it stops 0 fraud cases at the first attempt, at 0.0% transaction precision
+
+YOUR SCORER, HEADLINE VIEW
+  average precision 0.1529   ROC-AUC 0.5755
+
+YOUR SCORER, CORRECTED VIEW (per review budget)
+  alerts/day  headline recall  first-strike recall  redundancy  wrongly flagged
+          1            9.2%                1.9%      97.7%               75
+          2           19.8%                5.8%      96.8%              143
+          5           35.7%               19.2%      94.2%              426  <- primary
+         10           37.0%               19.2%      94.4%            1,017
+         20           38.2%               19.2%      94.5%            2,206
+         50           40.3%               21.2%      94.3%            5,781
+        100           41.8%               25.0%      93.5%           11,749
+        200           43.8%               25.0%      93.8%           23,689
+
+THE GAP: at 5 alerts/day your scorer reports 36% recall, but only 19% of fraud cases are stopped at their first attempt, and 94% of its correct alerts land on entities a 30-day blocklist already knows. The difference is what your headline metric is over-crediting.

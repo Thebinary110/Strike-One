@@ -164,8 +164,8 @@ def audit(df: pd.DataFrame, label_delay_days: float = 7.0) -> AuditResult:
             f"{pr['headline_recall']:.0%} recall, but only "
             f"{pr['fs_recall']:.0%} of fraud cases are stopped at their first "
             f"attempt, and {pr['redundancy_rate']:.0%} of its correct alerts "
-            f"land on entities a {label_delay_days:g}-day blocklist already "
-            f"knows. The difference is what your headline metric is "
+            f"are later attempts by fraudsters already detected in this "
+            f"window. The difference is what your headline metric is "
             f"over-crediting."
         )
     else:

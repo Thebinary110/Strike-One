@@ -182,11 +182,19 @@ export const Route = ({s, width}: {s: Session; width: number}) => {
       )}
       {prim && (
         <Sentence width={width} text={
-          `At ${fmt(prim.per_day)} alerts/day the same scorer stops ` +
-          `${pct(prim.fs_recall_off, 1)} of fraud cases alone and ` +
-          `${pct(prim.fs_recall_on, 1)} with the blocklist lane in front of ` +
-          `it: ${prim.lift === Infinity ? 'from zero' : prim.lift.toFixed(2) + 'x'}` +
-          ` the prevention, zero model changes. The routing protects any scorer.`
+          prim.lift > 1.05
+            ? `At ${fmt(prim.per_day)} alerts/day the same scorer stops ` +
+              `${pct(prim.fs_recall_off, 1)} of fraud cases alone and ` +
+              `${pct(prim.fs_recall_on, 1)} with the blocklist lane in front ` +
+              `of it: ${prim.lift === Infinity ? 'from zero' : prim.lift.toFixed(2) + 'x'}` +
+              ` the prevention, zero model changes.`
+            : `MEASURED: the blocklist lane adds nothing on this book ` +
+              `(lift ${prim.lift.toFixed(2)}x at ${fmt(prim.per_day)}/day)` +
+              (typeof r.lane1.legit_blocked === 'number'
+                ? ` and blocks ${fmt(r.lane1.legit_blocked)} legitimate ` +
+                  `transactions. Fraud here does not recur per entity, so ` +
+                  `this measurement says: do not deploy the lane.`
+                : `. Fraud here does not recur per entity.`)
         } />
       )}
     </Box>

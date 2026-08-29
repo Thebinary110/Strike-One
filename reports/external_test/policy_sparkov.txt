@@ -1,0 +1,6 @@
+STRIKE ONE POLICY
+  economics: margin 15%, abandonment 12.5%, step-up efficacy 78%, chargeback handling 30 (amount units)
+  recommended mix: approve 93.6%  ask-to-verify 6.2%  block 0.2%
+  realized cost: policy 170,697 vs approve-all 275,999 vs best fixed threshold 187,234
+  savings vs approve-all: 38.2%
+  honest corner: at m=0.05, a=0.125, e=0.775, c_h=30.0 the cost-derived policy's edge over a fixed threshold is -0.23% of approve-all cost, its weakest point in the declared ranges. Shown, not hidden.

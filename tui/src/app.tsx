@@ -7,8 +7,9 @@ import {Audit, Case, Connect, Econ, Route, Session, Stream} from './screens.js';
 const TABS = ['CONNECT', 'AUDIT', 'ROUTE', 'ECONOMICS', 'STREAM', 'CASE'];
 const CENTRAL = {m: 0.15, a: 0.125, e: 0.775, c_h: 30.0};
 
-export const App = ({initialExample, frameTab, motion}: {
-  initialExample?: string; frameTab?: number; motion: boolean;
+export const App = ({initialExample, initialSource, frameTab, motion}: {
+  initialExample?: string; initialSource?: string; frameTab?: number;
+  motion: boolean;
 }) => {
   const {exit} = useApp();
   const {stdout} = useStdout();
@@ -76,13 +77,27 @@ export const App = ({initialExample, frameTab, motion}: {
   }
 
   useEffect(() => {
-    if (initialExample) load({example: initialExample});
+    if (initialSource) load({source: initialSource});
+    else if (initialExample) load({example: initialExample});
   }, []);
 
-  // frame mode: render once loaded, then exit (used for captures/tests)
+  // frame mode: exit only once the tab's own content has arrived
   useEffect(() => {
     if (frameTab === undefined) return;
-    if (sess.status === 'ready' && (frameTab !== 5 || sess.caseData)) {
+    if (sess.status === 'error') {
+      const t = setTimeout(() => exit(), 200);
+      return () => clearTimeout(t);
+    }
+    if (sess.status !== 'ready') return;
+    const contentReady = [
+      !!sess.check,
+      !!sess.audit,
+      !!sess.route,
+      !!sess.policy || !sess.meta?.has_p,
+      !!sess.stream || !sess.meta?.has_score,
+      !!sess.caseData,
+    ][frameTab];
+    if (contentReady) {
       const t = setTimeout(() => exit(), 400);
       return () => clearTimeout(t);
     }

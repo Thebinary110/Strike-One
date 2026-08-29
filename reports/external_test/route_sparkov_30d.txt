@@ -1,0 +1,14 @@
+STRIKE ONE ROUTE
+  lane 1 auto-blocks 4,856 transactions (2.93%) on 27 known entities, consuming no reviews
+  of those, 4,856 are labelled legitimate: the standing policy's own cost, counted
+
+MEASURED LIFT, FIRST-STRIKE RECALL (same scorer, lane on vs off)
+  alerts/day   lane OFF   lane ON     lift
+          1      1.9%      1.9%    1.00x
+          2      5.8%      5.8%    1.00x
+          5     19.2%     19.2%    1.00x
+         10     19.2%     19.2%    1.00x
+         20     19.2%     19.2%    1.00x
+         50     21.2%     21.2%    1.00x
+        100     25.0%     25.0%    1.00x
+        200     25.0%     25.0%    1.00x

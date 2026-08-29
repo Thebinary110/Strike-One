@@ -12,8 +12,9 @@ const get = (flag: string): string | undefined => {
 const TAB_NAMES = ['connect', 'audit', 'route', 'economics', 'stream', 'case'];
 const frameName = get('--frame');
 const frameTab = frameName ? TAB_NAMES.indexOf(frameName) : undefined;
+const source = get('--source');
 const example = get('--example')
-  ?? (frameName ? 'ieee-cis' : undefined);
+  ?? (frameName && !source ? 'ieee-cis' : undefined);
 const motion = frameName === undefined && !args.includes('--no-motion')
   && !process.env.STRIKEONE_NO_MOTION;
 
@@ -27,7 +28,7 @@ const interactive = process.stdout.isTTY && frameName === undefined;
 if (interactive) process.stdout.write('\x1b[?1049h\x1b[H'); // alt buffer
 
 const instance = render(
-  <App initialExample={example}
+  <App initialSource={source} initialExample={example}
        frameTab={frameTab === -1 ? undefined : frameTab}
        motion={motion} />,
   {exitOnCtrlC: true},
