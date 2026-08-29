@@ -62,6 +62,85 @@ ranges hold whichever of A/B ships; they are priors to be surprised by,
 not targets to hit. A result far outside them means first "look for a
 bug", and only then "update the theory".
 
+## Extension, committed before the seal opens (Stage 7 gate requirement)
+
+### A. The risk to the punchline, predicted in advance
+
+Holdout entity novelty is higher than validation's (67.4% of rows on
+never-seen-in-train UIDs vs 55.8%; 54.9% vs all-prior data vs 52.7%).
+Two consequences, called now:
+
+1. **The routing gap should NARROW.** Fewer already-flagged entities mean
+   lane 1 covers proportionally less traffic, so the redundancy that
+   routing removes from the ranking population is smaller. Predictions:
+   holdout lane-1 row share **below validation's 2.14%** (roughly
+   1.2–2.0%), lane-1 share of positives **below validation's 33.0%**
+   (roughly 18–30%), and the routing-inoculation ratio for B at ~18
+   alerts/day **narrowing from validation's 3.1× to roughly 1.5–2.8×** —
+   still material, but visibly smaller.
+2. **The distortion itself should be WEAKER on holdout.** A smaller
+   propagated share of positives (validation: 63.0%; predicted holdout:
+   roughly 45–60%) leaves less for the headline scorer to feed on.
+   Predictions: **B's AP advantage over A shrinks from validation's +0.17
+   to roughly +0.06 to +0.14**; the three-system precision/prevention
+   inversion **persists directionally** (blocklist and B posting higher
+   transaction precision than A at matched budgets while catching fewer
+   or zero first strikes) with smaller magnitude; B's first-strike
+   deficit at tight budgets persists but compressed.
+
+If the distortion shrinks as called, that is evidence *about the
+mechanism* (the distortion scales with the propagated share, exactly as
+the label-propagation account requires). Stated before any holdout number
+was seen.
+
+### B. Pre-registered analysis plan — nothing added or dropped after the
+numbers are seen
+
+Exactly these figures, in exactly this order, at exactly these operating
+points. Primary comparisons are marked; everything else is secondary.
+
+1. **[PRIMARY] Headline range check** — Baseline A (frozen booster
+   `baseline_a.txt`, config 904a84eb) on all holdout rows: AP and ROC-AUC
+   against the ranges above (AP [0.32, 0.48], AUC [0.86, 0.91]).
+2. **[PRIMARY] Distortion size** — B (Stage 2 recipe refit on days 1–112
+   with early stopping on validation, saved before unsealing) on all
+   holdout rows: AP/AUC; B−A AP gap against prediction A.2.
+3. **[PRIMARY] The inversion** — at the blocklist's natural holdout
+   operating point N: blocklist / A / B transaction precision and
+   first-strike catches at budget N (the three-system table).
+4. **[PRIMARY] Routing inoculation** — B routed vs unrouted first-strike
+   recall at 18 alerts/day (576 alerts) against prediction A.1.
+5. Episode table at the stated default (100 alerts/day → 3,200 alerts
+   over 32 days): shipped two-lane+A2, single-lane B, single-lane A,
+   blocklist — FS recall, friction efficiency, redundancy rate,
+   transaction precision. **The two console counters at this point.**
+6. First-strike recall and friction efficiency across the capacity curve
+   (per-day grid {5,10,18,25,36,50,71,100,140,200,280,400,500}), all four
+   scorer×routing configurations.
+7. **SECONDARY refit** — headline AP/AUC of the day-147 refit (policy in
+   C) against ranges (AP [0.50, 0.62], AUC [0.90, 0.93]); the
+   primary-vs-secondary delta as the price of retraining cadence; plus
+   the secondary two-lane counters at 100/day.
+8. Loss-weighted first-strike recall at the default budget, primary
+   system (validation reference: 0.415).
+
+Bootstrap CIs (1,000 resamples, seed as everywhere) on items 1, 2, and
+the B−A first-strike delta in item 5; uid-cluster bootstrap for episode
+metrics. Roles computed on the global 1–182 stream under the fixed pooled
+convention. No other figures will be computed on the holdout, and none of
+the above will be dropped, whatever they show.
+
+### C. Locked reporting policy, restated
+
+PRIMARY = the frozen day-112 pipeline exactly as committed (A:
+`904a84eb…`; A2 + routing + isotonic map: `b632a136…`). SECONDARY = the
+same recipes refit through day 147: tree count chosen by the nested inner
+split (fit days 1–133, early-stop/calibrate on days 134–147), base model
+then refit on days 1–147 at that tree count, keeping the nested
+calibration map. **Calibration is never fitted on the holdout.** Both are
+reported; the delta prices retraining cadence. The holdout is opened
+exactly once, by one script, logging exactly one access.
+
 ## Falsifiable protocol claims
 
 - Validation→holdout drop is *expected*: no drop at all would be more

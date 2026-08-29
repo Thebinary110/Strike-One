@@ -28,6 +28,14 @@ operates under. **Routing inoculation:** an explicit blocklist lane lifts
 the headline model's own tight-budget first-strike recall 0.079 → 0.246
 (3.1×) without touching the model — the architecture protects any scorer.
 
+And the yardstick chose the better *system*, not just the better score:
+because the corrected metric selected a scorer with **no entity
+aggregates**, the shipped system needs **no online feature store — its
+total online state is one blocklist key-value set — and scores at 7.84 ms
+p99 on a laptop CPU** (577k rows/s batched). The distortion was pushing
+toward a heavier, statefuller system that prevented less; **the honest
+yardstick picked the simpler, faster, cheaper-to-operate one.**
+
 **Generalisation bridge — hypothesis, not measurement:** label
 propagation is not a quirk of this dataset's annotation; it is what any
 chargeback-derived label set looks like, because real blocklists work the
@@ -36,19 +44,49 @@ transaction-level metric is exposed to the same distortion. We measured
 it on one public benchmark; we did not measure it on anyone's production
 data, and we say so.
 
-## The audit that validates the method
+## Bugs our own checks caught
 
-Midway through, a check built to rule out one failure mode (entity
-fragmentation) caught a different one: a pandas-3 behaviour change had
-silently nulled the entity id on 11.4% of rows, and each null-entity
-fraud was being counted as its own "first strike" — **inflating our own
-headline metric by ~55%** (1,610 apparent first-strike episodes; 1,040
-real ones). The bug was found *because* the pipeline audits its own
-central number, fixed, regression-tested, and every affected result was
-rebuilt and corrected in place (`reports/STAGE_2.md` carries the banner;
-git history preserves the originals). We keep this story at the top
-because it is the strongest evidence we can offer that the numbers below
-survive hostile reading.
+Two independent self-catches, which we consider the strongest integrity
+signal in this repo:
+
+1. **A pandas-3 behaviour change silently nulled the entity id on 11.4%
+   of rows**, and each null-entity fraud was counted as its own "first
+   strike" — **inflating our own headline metric by ~55%** (1,610
+   apparent first-strike episodes; 1,040 real). Caught by the Stage 3
+   fragmentation audit — a check built for a *different* failure mode —
+   because the pipeline audits its own central number. Fixed,
+   regression-tested (`episode_roles` now refuses null ids), every
+   affected number rebuilt with correction banners; originals preserved
+   in git history.
+2. **A replay-preparation refit briefly trained the lane-2 model with the
+   bookkeeping `uid` column as a 43,000-category feature** (scores
+   diverged from the frozen system by up to 0.67). Caught immediately by
+   the cache-match assertion that requires any rescoring to reproduce the
+   frozen artifact's outputs; fixed by scoring only with the
+   hash-verified frozen booster.
+
+A submission whose checks have never fired is a submission whose checks
+were never tested. Ours fired twice, on our own headline numbers, before
+any external reader saw them.
+
+## Why no graph model
+
+The plan reserved time for a graph-feature ablation. We skipped it — not
+on a prediction, but on three measurements already in our reports:
+
+1. **The outcome space collapsed.** With the blocklist lane on, two very
+   different scorers (A2 and the label-feature-heavy B) sit within ±0.01
+   first-strike recall of each other across the entire capacity range.
+   An experiment in that space has no power to resolve a third scorer.
+2. **98.8% of first strikes are on entities never seen before** (1,027 of
+   1,040 validation episodes). A graph over past edges has no
+   neighbourhood exactly where all the prevention lives.
+3. **Behavioural history over those same edges measured actively harmful
+   where it is populated**: −0.0657 AP within known entities (CI
+   excluding zero), because there the label is determined by propagation
+   history, not behaviour.
+
+Showing this reasoning beats manufacturing a null we can already derive.
 
 ## Read the limitations first
 
