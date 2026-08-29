@@ -1,5 +1,19 @@
 # Stage 6 — The product surface
 
+> **Addendum (post-Stage-7 rebuild, presentation only).** The reviewer's
+> Stage 6 spec asked for a scorer *selector*; that was wrong — a selector
+> shows one system at a time while the claim is a comparison. The screen
+> was rebuilt around a permanent side-by-side (shipped two-lane+A2 vs
+> headline single-lane B) with the delta as the loudest element, FPs shown
+> as a trade inside the comparison, slider defaulted to 100/day and capped
+> at 200/day with a typical-capacity band, a real labelled capacity chart,
+> a curated real-episode timeline (deterministic selection rule, asserts
+> no fraud-free entity) with the propagated run drawn as a shaded
+> "already covered by the blocklist" band, and a decisions-only stream
+> with caught first strikes marked. Frozen pipeline, frozen numbers —
+> nothing about the model changed. Default-view replica (drawn from the
+> live API): `stage6/console_default_view.png`.
+
 ## Surprises first
 
 1. **The console made the model war look like a sideshow — the routing is

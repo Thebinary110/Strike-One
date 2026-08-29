@@ -28,6 +28,10 @@ from strikeone import metrics as M
 STATIC = Path(__file__).parent / "console_static"
 
 ACTION_NAMES = {0: "approve", 1: "step-up", 2: "block"}
+APPROVE_CODE = 0
+# capacity grid capped at 200/day: above that the operating point reviews
+# >6% of all traffic, which no risk team does
+PER_DAY_GRID = [5, 10, 18, 25, 36, 50, 71, 100, 140, 200]
 
 
 def _js(v):
@@ -126,10 +130,18 @@ class Replay:
         ]
 
     # ------------------------------------------------------------- stream
-    def stream(self, start: int, limit: int) -> list[dict]:
+    def stream(self, start: int, limit: int, mode: str = "all") -> list[dict]:
+        """mode='action': only non-approve decisions and lane-1 routings —
+        the rows where something happens."""
+        if mode == "action":
+            m = (self.df["action_central"] != APPROVE_CODE) | self.df["lane1_flag"]
+            frame = self.df[m]
+        else:
+            frame = self.df
         rows = []
-        for i in range(start, min(start + limit, self.n)):
-            r = self.df.iloc[i]
+        for i in range(start, min(start + limit, len(frame))):
+            r = frame.iloc[i]
+            action = ACTION_NAMES[int(r["action_central"])]
             rows.append({
                 "i": i,
                 "tid": _js(r["TransactionID"]),
@@ -137,10 +149,15 @@ class Replay:
                 "uid": r["uid"],
                 "amount": round(float(r["amount"]), 2),
                 "lane": "lane-1" if r["lane1_flag"] else "lane-2",
-                "action": ACTION_NAMES[int(r["action_central"])],
+                "action": action,
                 "p": None if math.isnan(r["p_shipped"]) else round(float(r["p_shipped"]), 4),
                 "role": int(r["role"]),
                 "y": int(r["y"]),
+                # the moment the system exists for: a first strike, stopped
+                "caught_fs": bool(
+                    int(r["role"]) == episodes.ROLE_FIRST_STRIKE
+                    and (action != "approve" or bool(r["lane1_flag"]))
+                ),
             })
         return rows
 
@@ -162,16 +179,34 @@ class Replay:
 
     @lru_cache(maxsize=1)
     def featured(self) -> list:
+        """Curated real episodes, deterministic selection rule (no hardcoded
+        ids): exactly one first strike in the slice, several propagated
+        positives after it, and at least one legitimate row for contrast.
+        Ordered by fraud count then amount at stake. Falls back to looser
+        thresholds rather than ever returning a fraud-free entity."""
         d = self.df
         agg = d.groupby("uid").agg(
-            n=("y", "size"), frauds=("y", "sum"),
+            n=("y", "size"), frauds=("y", "sum"), amt=("amount", "sum"),
             fs=("role", lambda r: int((r == episodes.ROLE_FIRST_STRIKE).sum())),
         )
-        good = agg[(agg["fs"] == 1) & (agg["frauds"] >= 3)
-                   & (agg["n"] > agg["frauds"])]
-        good = good.sort_values("n", ascending=False).head(8)
-        return [{"uid": u, "n": int(r["n"]), "frauds": int(r["frauds"])}
-                for u, r in good.iterrows()]
+        for min_frauds, need_legit, need_resolved in [
+            (4, True, True), (3, True, True), (4, True, False),
+            (3, True, False), (2, False, False), (1, False, False),
+        ]:
+            good = agg[(agg["fs"] == 1) & (agg["frauds"] >= min_frauds)]
+            if need_resolved:  # prefer fully-resolved uids (no pooled "nan")
+                good = good[~good.index.str.contains("_nan")]
+            if need_legit:
+                good = good[good["n"] > good["frauds"]]
+            if len(good) >= 5:
+                break
+        good = good.sort_values(["frauds", "amt"], ascending=False).head(8)
+        out = [{"uid": u, "n": int(r["n"]), "frauds": int(r["frauds"])}
+               for u, r in good.iterrows()]
+        assert out and all(e["frauds"] >= 1 for e in out), (
+            "featured-episode selection produced a fraud-free entity"
+        )
+        return out
 
     # ------------------------------------------------------ decision object
     def score_tx(self, tid: int) -> dict:
@@ -253,7 +288,7 @@ def make_handler(replay: Replay):
                         q.get("scorer", "shipped"), q.get("routing", "on"),
                         int(q.get("per_day", 100))))
                 elif u.path == "/api/curve":
-                    pds = [5, 10, 18, 25, 36, 50, 71, 100, 140, 200, 280, 400, 500]
+                    pds = PER_DAY_GRID
                     self._json({
                         "per_days": pds,
                         "series": {
@@ -264,7 +299,8 @@ def make_handler(replay: Replay):
                     })
                 elif u.path == "/api/stream":
                     self._json(replay.stream(int(q.get("start", 0)),
-                                             int(q.get("limit", 200))))
+                                             int(q.get("limit", 200)),
+                                             q.get("mode", "all")))
                 elif u.path == "/api/entity":
                     self._json(replay.entity(q["uid"]))
                 elif u.path == "/api/featured":
