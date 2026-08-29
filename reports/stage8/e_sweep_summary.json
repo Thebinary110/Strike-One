@@ -1,0 +1,90 @@
+{
+  "note": "post-hoc reviewer-requested extension; declared e range widened from [0.6, 0.95] to [0.2, 0.95] AFTER second-access results were seen (a reviewer challenged the floor); computed from the committed Stage-7 replay artifact, no new holdout access; e>=0.6 slice asserted equal to the logged-access grid",
+  "replay_reproduces_logged_access_max_dev": 0.0,
+  "per_e": [
+    {
+      "e": 0.2,
+      "k_of_27_ci_excludes_zero": 13,
+      "median_edge_pct": 0.984,
+      "min_edge_pct": -0.081,
+      "min_ci_lo_pct": -1.836,
+      "weakest_corner": {
+        "m": 0.25,
+        "a": 0.2,
+        "c_h": 30.0
+      }
+    },
+    {
+      "e": 0.3,
+      "k_of_27_ci_excludes_zero": 16,
+      "median_edge_pct": 1.709,
+      "min_edge_pct": 0.392,
+      "min_ci_lo_pct": -1.102,
+      "weakest_corner": {
+        "m": 0.15,
+        "a": 0.2,
+        "c_h": 15.0
+      }
+    },
+    {
+      "e": 0.4,
+      "k_of_27_ci_excludes_zero": 23,
+      "median_edge_pct": 3.602,
+      "min_edge_pct": 0.717,
+      "min_ci_lo_pct": -0.591,
+      "weakest_corner": {
+        "m": 0.05,
+        "a": 0.2,
+        "c_h": 60.0
+      }
+    },
+    {
+      "e": 0.5,
+      "k_of_27_ci_excludes_zero": 27,
+      "median_edge_pct": 5.786,
+      "min_edge_pct": 2.072,
+      "min_ci_lo_pct": 0.914,
+      "weakest_corner": {
+        "m": 0.05,
+        "a": 0.2,
+        "c_h": 60.0
+      }
+    },
+    {
+      "e": 0.6,
+      "k_of_27_ci_excludes_zero": 27,
+      "median_edge_pct": 8.439,
+      "min_edge_pct": 3.352,
+      "min_ci_lo_pct": 2.364,
+      "weakest_corner": {
+        "m": 0.05,
+        "a": 0.2,
+        "c_h": 60.0
+      }
+    },
+    {
+      "e": 0.775,
+      "k_of_27_ci_excludes_zero": 27,
+      "median_edge_pct": 14.196,
+      "min_edge_pct": 6.752,
+      "min_ci_lo_pct": 5.507,
+      "weakest_corner": {
+        "m": 0.05,
+        "a": 0.2,
+        "c_h": 60.0
+      }
+    },
+    {
+      "e": 0.95,
+      "k_of_27_ci_excludes_zero": 27,
+      "median_edge_pct": 21.97,
+      "min_edge_pct": 13.396,
+      "min_ci_lo_pct": 11.688,
+      "weakest_corner": {
+        "m": 0.05,
+        "a": 0.2,
+        "c_h": 60.0
+      }
+    }
+  ]
+}

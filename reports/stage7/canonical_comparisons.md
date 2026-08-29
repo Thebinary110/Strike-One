@@ -5,7 +5,8 @@ slice. All rows are HOLDOUT (days 151–182, sealed; two logged accesses,
 each against a pre-registered plan committed beforehand) unless marked.
 Any figure quoted anywhere — video, README, panel Q&A — must match a row
 here verbatim. C1–C8 are from the first access (Stage 7, commit 188b471);
-C9–C12 from the second (commit 67d35f7, `reports/stage8/`).
+C9–C12 from the second (commit 67d35f7, `reports/stage8/`); C13 is a
+post-hoc replay-artifact analysis, labelled as such in its row.
 
 | ID | Contrast (exact) | Operating point | Figure | Source |
 |---|---|---|---|---|
@@ -19,10 +20,12 @@ C9–C12 from the second (commit 67d35f7, `reports/stage8/`).
 | C6 | Primary (frozen d112) vs secondary (refit d147, nested calibration): AP | all holdout rows | 0.5319 [0.5167, 0.5504] → 0.6001 [0.5843, 0.6176] = **+0.068** | items 1, 7 |
 | C7 | Shipped system honest costs | 3,200 alerts (100/day) | precision **0.434**, false positives **1,810**, lane-1 legitimate blocks **891** | item5 |
 | C8 | Headline AUCs, context for the ceiling note | all holdout rows | A 0.9033 · B 0.9544 (vs winner's private 0.9459 — B holds delayed labels no entrant had) | items 1, 2 |
-| C9 | **Baseline** contrast: rank-by-amount (no model) vs shipped two-lane+A2, LOSS-WEIGHTED first-hit recall | 3,200 alerts (100/day) | **0.3447 vs 0.4733** (ratio 1.37×; we predicted ≥2× — prediction missed, direction held). Rank-by-amount's unweighted numbers: 5.3% first-hit recall, 5.5% precision, 3,023 FPs | `reports/stage8/baselines_kcurve.csv` |
+| C9 | **Baseline** contrast: rank-by-amount (no model) vs shipped two-lane+A2. HEADLINE = unweighted first-hit recall; loss-weighted is secondary and never quoted without this row beside it (any loss-weighted metric partially rewards amount-ranking by construction) | 3,200 alerts (100/day) | unweighted first-hit recall **5.3% vs 58.3%** (11×), precision 5.5% vs 45.7%; loss-weighted **0.3447 vs 0.4733** (1.37×; we predicted ≥2× — prediction missed, direction held) | `reports/stage8/baselines_kcurve.csv` |
 | C10 | **Floor** contrast: random ranking, all metrics | 3,200 alerts (100/day) | first-hit recall 3.8%, loss-weighted 3.4%, precision 3.4% (≈ budget share, as predicted) | same |
 | C11 | **Robustness**: label-maturity sweep, shipped − B first-hit recall delta (uid-cluster CI), evaluation-side only | 3,200 alerts; delay 1→30 days | +0.0543 [+0.041, +0.068] at 1d → **+0.0434 [+0.031, +0.057] at 30d**; positive with CI excluding zero at every delay in {1,3,7,14,30}; no reversal, no boundary to name | `reports/stage8/maturity_sweep.csv` |
-| C12 | **Cost** (rebuilt, replaces the withdrawn same-data "81/81"): frozen validation-fitted policy vs per-corner validation-tuned fixed threshold, both evaluated on holdout, per-corner row-bootstrap CIs | 81 corners (s=0 grid) | **81 of 81 CIs exclude zero**; median edge **+14.4%** of approve-all cost, IQR [+9.3%, +20.5%], weakest corner +3.4%. Assumes a blocked fraud is fully avoided and a stepped-up one avoided with probability e; that assumption's sensitivity is the e (and s) grid dimension | `reports/stage8/cost_rebuild_grid.csv` |
+| C12a | **Cost, decomposed (1/2)**: three-action cost policy vs best two-action fixed threshold (validation-tuned per corner), both evaluated on holdout — mostly the value of HAVING a step-up action at all | 81 corners (s=0 grid) | **81 of 81 CIs exclude zero**; median edge **+14.4%** of approve-all cost, IQR [+9.3%, +20.5%], weakest corner +3.4%. Assumes a blocked fraud is fully avoided and a stepped-up one avoided with probability e | `reports/stage8/cost_rebuild_grid.csv` |
+| C12b | **Cost, decomposed (2/2)**: amount-aware vs amount-blind three-action — the value of cost-derived thresholding itself | 81 corners, VALIDATION (Stage 4) | **55/81, central gap 0.04%** — approximately nothing. Most of C12a's advantage is the action set, not the arithmetic | `reports/STAGE_4.md` (surprise 3 / corrections) |
+| C13 | **Cost, stress-tested**: extended step-up-efficacy sweep e ∈ [0.2, 0.95] — a post-hoc, reviewer-requested widening AFTER results were seen (stated); no new unseal (runs on the committed Stage-7 replay artifact; e ≥ 0.6 slice reproduces C12a exactly, max deviation 0.0) | 27 (m,a,c_h) corners per e level | unanimity holds down to **e\* = 0.5** (27/27, median +5.8%, weakest +2.1%); below it corners drop out (23/27 at e=0.4, 13/27 at e=0.2, weakest point −0.1%); the median edge never breaks in [0.2, 0.95] | `reports/stage8/e_sweep_grid.csv` |
 
 **Do not conflate:** C3 (−0.0192) is a *model* comparison, single-lane vs
 single-lane. C5 (698 vs 643) is a *system* comparison, two-lane vs

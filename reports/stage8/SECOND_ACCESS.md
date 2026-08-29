@@ -24,17 +24,25 @@ ride on top of the 3,200 reviewed alerts and are included in its
 precision/FP figures. Full k-curve at 7 budgets:
 `baselines_kcurve.csv`.)
 
-**Prediction: MISSED on magnitude, held on direction.** We predicted
-rank-by-amount's loss-weighted first-hit recall in 0.05–0.20 and a ≥2×
-margin for the shipped system. Actual: **0.3447**, margin **1.37×**.
-Fraud amounts on this data are top-heavy enough that ranking by amount
-alone — no model — recovers 73% of the shipped system's loss-weighted
-number at the primary budget, while being useless on every unweighted
-metric (5.3% of cases caught first-hit, 5.5% precision, 3,023 angry good
-customers). The shipped system stays ahead on loss-weighted recall at
-every budget in the grid (1.26×–1.83×), but the honest sentence is:
-**if your only objective were loss-weighted coverage and you tolerated
-~95% false positives, a sort-by-amount would get you most of the way.**
+**The headline metric is unweighted first-hit recall**: shipped 58.3%
+of cases vs rank-by-amount's 5.3% at the same budget (11×), at 45.7% vs
+5.5% precision. On the metric that has to be *usable* — cases caught,
+alerts an analyst can act on — the no-model baseline is nowhere.
+
+**Loss-weighted first-hit recall is secondary, and is only ever reported
+with the rank-by-amount row beside it.** The reason is structural: any
+loss-weighted metric partially rewards amount-ranking by construction —
+its numerator is denominated in the ranking key — so a sort-by-amount is
+the mandatory yardstick for it, and here that yardstick scores 0.3447
+against the shipped 0.4733 (73%). Our pre-registered prediction (the
+registered primary comparison was loss-weighted) called 0.05–0.20 and a
+≥2× margin: **missed on magnitude, held on direction** — the shipped
+system stays ahead at every budget in the grid (1.26×–1.83×), but the
+honest sentence is that if loss-weighted coverage were your only
+objective and ~95% false positives were tolerable, sorting by amount
+gets most of the way. This is less a fact about the shipped system than
+about loss-weighted metrics: they are weak discriminators because they
+partly measure "did you sort by amount".
 The random floor landed as predicted (~budget share on everything).
 
 ## 2. Label-maturity sweep (evaluation-side only)
@@ -87,16 +95,60 @@ favour; median edge +14.4% of approve-all cost, IQR [+9.3%, +20.5%],
 weakest corner +3.4%.** Prediction: k in [35, 65], median +1% to +4% —
 **missed on the favourable side, twice**. We predicted unanimity would
 die out-of-sample; it did not, and the median edge is ~4× our upper
-guess. Two honest readings of why the edge is that large: (a) most of it
-is the step-up action existing at all — a two-action threshold must buy
-fraud protection with hard blocks of good customers, while step-up
-prices the middle; (b) the counterfactual assumption feeds it directly:
-**a blocked fraudulent transaction is assumed fully avoided, and a
-stepped-up one avoided with probability e**. That assumption is not
-measurable in this data; its sensitivity is the e dimension (and the s
-liability-shift dimension) of the declared grid, and the +3.4% weakest
-corner is where those assumptions are least favourable. No single-point
-cost figure is stated, here or anywhere.
+guess.
+
+**Decomposed, so the number is attributed to the right cause.** The
+81/81 compares a three-action policy to a two-action threshold, so it
+bundles two different advantages. Split apart:
+
+| contrast | result | what it measures |
+|---|---|---|
+| three-action cost policy vs best two-action fixed threshold (holdout, this access) | **81/81, median +14.4%** | mostly the value of HAVING a step-up action at all |
+| amount-aware vs amount-blind three-action (validation, Stage 4) | **55/81, central gap 0.04%** | the value of cost-derived thresholding itself |
+
+**Most of the advantage is the action set, not the arithmetic.** A
+two-action threshold must buy fraud protection with hard blocks of good
+customers; step-up prices the middle, and that is where the +14.4%
+lives. The cost-derived, amount-aware argmin itself is worth
+approximately nothing over an amount-blind three-way split (Stage 4's
+own negative finding, kept). The counterfactual assumption feeds the
+first row directly: **a blocked fraudulent transaction is assumed fully
+avoided, and a stepped-up one avoided with probability e** — not
+measurable in this data. No single-point cost figure is stated, here or
+anywhere.
+
+### Where the advantage breaks: the extended e sweep
+
+The original declared range floored e at 0.6, which means the grid never
+tested the assumption the whole result rests on. **A reviewer challenged
+the floor after these results were seen, and the declared range was
+widened to e ∈ [0.2, 0.95] in response — a post-hoc extension, stated
+rather than slipped.** No new holdout access was needed or taken: the
+sweep runs on the committed Stage-7 replay artifact
+(`holdout_replay.parquet`), and its e ≥ 0.6 slice reproduces the
+logged-access grid **exactly** (max deviation 0.0 —
+`e_sweep_summary.json`). Same construction: validation-tuned fixed
+threshold per corner, both systems evaluated on holdout rows, 400
+bootstrap resamples; 27 (m, a, c_h) corners per e level:
+
+| e | corners with CI > 0 | median edge | weakest corner (point) |
+|---|---|---|---|
+| 0.95 | 27/27 | +22.0% | +13.4% |
+| 0.775 | 27/27 | +14.2% | +6.8% |
+| 0.60 | 27/27 | +8.4% | +3.4% |
+| **0.50** | **27/27** | **+5.8%** | **+2.1%** |
+| 0.40 | 23/27 | +3.6% | +0.7% |
+| 0.30 | 16/27 | +1.7% | +0.4% |
+| 0.20 | 13/27 | +1.0% | **−0.1%** |
+
+**The breaking point of the uniform claim is e\* = 0.5**: unanimity —
+every corner's CI excluding zero — holds down to a step-up that stops
+only half of fraud, and fails below it, corner by corner (23/27 at
+e = 0.4, 13/27 at e = 0.2, where the weakest corner's point estimate
+turns negative). The *median* edge never breaks anywhere in [0.2, 0.95].
+That is the expected signature of the decomposition above: as e falls,
+step-up stops paying, the policy converges to the threshold it is being
+compared against, and the edge goes to zero from above.
 
 ## Prediction scorecard for this access
 
@@ -114,4 +166,14 @@ rank-by-amount finding. It goes in the README, not a footnote: a
 no-model amount sort captures 73% of our loss-weighted headline at the
 primary budget. The corrected metric family (unweighted first-hit
 recall, precision, budget-matched FPs) is where the system actually
-earns its keep, and the README says so.
+earns its keep, the README leads with it, and loss-weighted figures are
+now reported only with the rank-by-amount row beside them.
+
+## On the 8-minute gap
+
+The pre-registration commit (67d35f7) landed 8 minutes before the
+unsealing, which could look thin. The defense is the one thing that
+cannot be forged after the fact: the pre-registration contains a numeric
+prediction that missed badly in the unfavourable direction —
+rank-by-amount called at 0.05–0.20, landed at 0.3447. Nobody
+reverse-engineers a pre-registration that makes themselves look wrong.

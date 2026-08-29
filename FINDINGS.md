@@ -134,18 +134,24 @@ for us (the rebuilt cost edge exceeded its predicted band). Full details:
 
 - **Every economic figure is an assumption range, not a fact.** We are
   not Razorpay and do not know their economics. Cost parameters are
-  declared ranges (m ∈ [0.05, 0.25], a ∈ [0.05, 0.20], e ∈ [0.60, 0.95],
-  c_h ∈ [15, 60] amount-units, liability shift s ∈ [0, 1], default 0)
-  with a published sensitivity grid and its weakest corner named. The
-  cost policy's edge over a fixed threshold was rebuilt out-of-sample
-  after review (the original same-data "81/81" was withdrawn as
-  near-tautological — Cawley & Talbot, JMLR 2010): validation-tuned
-  threshold vs validation-fitted policy, both scored on the sealed
-  holdout, per-corner bootstrap CIs — **81 of 81 corners, median edge
-  +14.4% of approve-all cost, IQR [+9.3%, +20.5%], weakest corner
-  +3.4%**, under the stated counterfactual assumption (a blocked fraud
-  is fully avoided; a stepped-up one avoided with probability e — the
-  e and s grid dimensions are that assumption's sensitivity). No single
+  declared ranges (m ∈ [0.05, 0.25], a ∈ [0.05, 0.20], e ∈ [0.2, 0.95] —
+  the e floor was widened from 0.6 after a reviewer challenged it,
+  post-results and stated as such — c_h ∈ [15, 60] amount-units,
+  liability shift s ∈ [0, 1], default 0) with a published sensitivity
+  grid and its weakest corner named. The cost policy's edge over a fixed
+  threshold was rebuilt out-of-sample after review (the original
+  same-data "81/81" was withdrawn as near-tautological — Cawley &
+  Talbot, JMLR 2010): validation-tuned threshold vs validation-fitted
+  policy, both scored on the sealed holdout, per-corner bootstrap CIs —
+  **81 of 81 corners, median edge +14.4% of approve-all cost** — and
+  then decomposed: that advantage is **mostly the value of having a
+  step-up action at all** (amount-aware vs amount-blind three-action:
+  55/81, central gap 0.04% — the cost arithmetic itself is worth
+  approximately nothing). The extended e sweep names the breaking
+  point: unanimity holds down to **e = 0.5** and fails corner-by-corner
+  below it; the median edge never goes negative in [0.2, 0.95]. All
+  under the stated counterfactual assumption (a blocked fraud is fully
+  avoided; a stepped-up one avoided with probability e). No single
   rupee figure is stated as fact anywhere.
 - **The entity key is a proxy** for the host's true propagation key;
   episode results are reported under alternate keys with the sensitivity
@@ -193,17 +199,19 @@ worse at prevention. Retraining cadence is worth **+0.068 AP**
 Stage 6.
 
 **Baselines nobody can skip (second access).** At the same 3,200 alerts:
-a random ranker sits at the budget share on everything (~3–4%). A
-**rank-by-amount sort — no model — reaches 0.3447 loss-weighted
-first-hit recall, 73% of the shipped system's 0.4733.** We predicted
-0.05–0.20 and a ≥2× margin; that prediction missed, and per the
-pre-registration the finding is reported here, not buried: on this data,
-if loss-weighted coverage were the only objective and ~95% false
-positives were tolerable, sorting by amount gets most of the way. The
-shipped system stays ahead at every budget (1.26–1.83×) and wins where
-the ranking has to be *usable*: rank-by-amount catches 5.3% of cases
-first-hit at 5.5% precision (3,023 flagged good customers) vs the
-shipped 58.3% at 45.7%. `reports/stage8/baselines_kcurve.csv`.
+a random ranker sits at the budget share on everything (~3–4%). On the
+headline metric — unweighted first-hit recall — a rank-by-amount sort is
+nowhere: **5.3% of cases at 5.5% precision (3,023 flagged good
+customers) vs the shipped 58.3% at 45.7%**. On *loss-weighted* first-hit
+recall, though, the same no-model sort **reaches 0.3447, 73% of the
+shipped 0.4733**; we predicted 0.05–0.20 and a ≥2× margin, and that
+prediction missed. Per the pre-registration the finding is reported, not
+buried — and it is a finding about metric design as much as about this
+system: any loss-weighted metric partially rewards amount-ranking by
+construction (its numerator is denominated in the ranking key). So
+loss-weighted figures are secondary here and never quoted without the
+rank-by-amount row beside them. The shipped system stays ahead of it at
+every budget (1.26–1.83×). `reports/stage8/baselines_kcurve.csv`.
 
 **The conclusion survives slower labels (second access).** Rebuilding
 the evaluation-side blocklist at 1/3/7/14/30-day maturity: the shipped

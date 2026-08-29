@@ -149,21 +149,32 @@ every figure: [`reports/stage7/canonical_comparisons.md`](reports/stage7/canonic
   blocklist at 1–30-day label maturity, the shipped system's first-hit
   edge stays positive with CIs excluding zero at every delay (+0.054 at
   1 day, +0.043 at 30). No reversal; no boundary to name.
-- **A baseline we could not skip, reported because it surprised us:**
-  ranking by amount alone — no model — reaches **0.345 loss-weighted
-  first-hit recall at 100 reviews/day, 73% of our 0.473**. We
-  pre-registered a prediction that it would land in 0.05–0.20; it did
-  not. It never beats the shipped system at any budget, and it is
-  unusable on every unweighted metric (5.3% of cases caught, 5.5%
-  precision), but if loss-weighted coverage were your only objective, a
-  sort-by-amount gets most of the way on this data.
-- **Costs, out-of-sample:** the three-action policy beats a
-  validation-tuned fixed threshold on the holdout in **81 of 81 declared
-  economic corners** (per-corner bootstrap CIs excluding zero), median
-  edge +14.4% of approve-all cost, IQR [+9.3%, +20.5%], weakest corner
-  +3.4% — under the stated counterfactual that a blocked fraud is fully
-  avoided and a stepped-up one avoided with probability e (the e and s
-  grid dimensions are that assumption's sensitivity). An earlier
+- **A baseline we could not skip, reported because it surprised us.**
+  On the headline metric — unweighted first-hit recall — ranking by
+  amount alone catches **5.3% of cases at 5.5% precision** vs the
+  shipped **58.3% at 45.7%** (100 reviews/day). But on *loss-weighted*
+  first-hit recall the same no-model sort reaches **0.345, 73% of our
+  0.473**, against a pre-registered prediction of 0.05–0.20. The
+  mechanism is structural: any loss-weighted metric partially rewards
+  amount-ranking by construction (its numerator is denominated in the
+  ranking key). So the headline here is unweighted; loss-weighted
+  figures are secondary and never quoted without the rank-by-amount row
+  beside them.
+- **Costs, out-of-sample and decomposed:** the three-action policy
+  beats a validation-tuned fixed threshold on the holdout in **81 of 81
+  declared economic corners** (per-corner bootstrap CIs excluding zero),
+  median edge +14.4% of approve-all cost — but that is **mostly the
+  value of having a step-up action at all, not of cost-derived
+  thresholding**: amount-aware vs amount-blind three-action is 55/81
+  with a central gap of 0.04% (Stage 4's own negative finding, kept).
+  Most of the advantage is the action set, not the arithmetic. Stress-
+  tested by widening the step-up-efficacy range to e ∈ [0.2, 0.95]
+  after a reviewer challenged the original 0.6 floor (a post-hoc
+  extension, stated as such; no new holdout access — computed from the
+  committed replay artifact): unanimity holds down to **e = 0.5** and
+  fails corner-by-corner below it; the median edge never goes negative.
+  All under the stated counterfactual that a blocked fraud is fully
+  avoided and a stepped-up one avoided with probability e. An earlier
   same-data version of this claim was withdrawn as near-tautological
   (Cawley & Talbot, JMLR 2010); this is the rebuilt one.
 

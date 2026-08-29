@@ -19,9 +19,14 @@ import pandas as pd
 from strikeone import metrics as M
 
 DECLARED_RANGES = {"m": [0.05, 0.15, 0.25], "a": [0.05, 0.125, 0.20],
-                   "e": [0.60, 0.775, 0.95], "c_h": [15.0, 30.0, 60.0],
+                   "e": [0.2, 0.775, 0.95], "c_h": [15.0, 30.0, 60.0],
                    "s": [0.0, 0.5, 1.0]}
 CENTRAL = {"m": 0.15, "a": 0.125, "e": 0.775, "c_h": 30.0, "s": 0.0}
+# The e floor was widened 0.6 -> 0.2 AFTER the second-access results were
+# seen, because a reviewer challenged the original floor (the grid never
+# tested the assumption the cost result rests on). Stated, not slipped:
+# see reports/stage8/e_sweep_summary.json. The frozen central point and
+# the shipped default policy are unchanged.
 # s = liability shifted to the issuer on successful step-up authentication.
 # DEFAULT 0: the shipped policy at default is bit-identical to the frozen
 # config (asserted by test). The sweep explores s > 0; it never changes the
