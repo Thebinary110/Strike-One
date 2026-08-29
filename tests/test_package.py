@@ -171,3 +171,18 @@ def test_next_action_derives_from_wasted_column():
         assert row["hits"] + row["false_positives"] == row["budget"]
         assert row["fs_catches"] <= row["hits"]
         assert row["redundant"] <= row["hits"]
+
+
+def test_history_reclassifies_prewindow_cases():
+    # window truncation: e2's d30 strike is a fresh case unless history
+    # says e2 was flagged before the window; then it is already-begun,
+    # excluded from first-attempt counts, and blocklist-recoverable
+    df, _ = mapped()
+    r0 = audit(df, label_delay_days=7.0)
+    r1 = audit(df, label_delay_days=7.0, history_entities={"e2"})
+    assert r0.stats["episodes"] == 2
+    assert r1.stats["episodes"] == 1
+    assert r1.stats["cases_reclassified"] == 1
+    assert r1.blocklist["recovered_rows"] == r0.blocklist["recovered_rows"] + 1
+    assert "plus your supplied history" in r1.to_text()
+    assert "upper bound" in r0.to_text()

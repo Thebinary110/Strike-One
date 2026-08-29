@@ -96,8 +96,18 @@ def cmd_audit(args) -> int:
     if len(df) > 300_000 and sys.stderr.isatty():
         print(f"auditing {len(df):,} rows; this can take ~10s ...",
               file=sys.stderr)
+    hist = None
+    if args.history:
+        hp = Path(args.history)
+        if hp.suffix in (".parquet", ".pq", ".csv"):
+            hdf = contract.read_source(str(hp))
+            col = "entity" if "entity" in hdf.columns else hdf.columns[0]
+            hist = set(hdf[col].astype(str))
+        else:
+            hist = set(hp.read_text().split())
     res = audit_mod.audit(df, label_delay_days=m.label_delay_days,
-                          capacity_per_day=args.capacity)
+                          capacity_per_day=args.capacity,
+                          history_entities=hist)
     color = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
     print(res.to_json() if args.json
           else res.to_text(color=color, verbose=args.verbose))
@@ -110,9 +120,10 @@ why these numbers differ from reports/stage7 (they should, and here is how):
   scorer: this audits the frozen lane-2 model A2 standalone; the stage-7
     headline AP 0.5319 is Baseline A, and its 698/1,198 counters are the
     two-lane SYSTEM (blocklist lane + A2), not a bare scorer
-  window: case boundaries and the blocklist here see only this file
-    (1,462 cases, 566 flags at 73.0%); stage 7 had the full 182-day
-    stream behind the same window (1,198 cases, 1,775 flags at 49.8%)
+  window truncation: fraudsters already active before day 151 look like
+    fresh first attempts inside this file, inflating cases to 1,462 vs
+    stage 7's full-stream 1,198 (and the blocklist to 566 flags at 73.0%
+    vs 1,775 at 49.8%). Disclosed in the footer; --history removes it
   alerts: 100/day x the exact 31.9985-day span = 3,199 vs stage 7's 3,200
 Your own export gets exactly this standalone treatment, which is why the
 hero shows it.""")
@@ -187,8 +198,13 @@ def main(argv=None) -> None:
         p.set_defaults(fn=fn)
         if name == "audit":
             p.add_argument("--capacity", type=float, default=None,
-                           help="your review capacity, alerts/day (otherwise "
-                                "inferred from your fraud volume)")
+                           help="your review capacity, alerts/day (default: "
+                                "a stated 100/day)")
+            p.add_argument("--history",
+                           help="file of entity ids flagged BEFORE this "
+                                "window (one per line, or csv/parquet with "
+                                "an entity column); tightens first-attempt "
+                                "counts from upper bound to measured")
             p.add_argument("--verbose", action="store_true",
                            help="add the technical block (episodes, friction "
                                 "efficiency)")

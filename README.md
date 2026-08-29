@@ -79,7 +79,10 @@ AT OTHER REVIEW BUDGETS
 
 ──────────────────────────────────────────────────────────────────────────
 ASSUMED, NOT MEASURED
-  fraud labels mature in 7 days here; slower maturity shrinks
+  cases are bounded by this file. Any fraudster already active before it
+  starts counts here as a first attempt, so first-attempt stops are an
+  upper bound. A longer window, or --history, tightens it.
+  Fraud labels mature in 7 days here; slower maturity shrinks
   every blocklist figure above. Case boundaries come from your entity key;
   a coarser or finer key moves them. This audit evaluates only the score
   column you provided: no other model was applied to your traffic, and

@@ -79,6 +79,11 @@ class AuditResult:
             L.append(f"  entity key resolves cleanly on {res_pct:.1%} of rows")
         L.append(f"  fraud labels assumed knowable "
                  f"{s['label_delay_days']:g} days after the transaction")
+        if s.get("history_supplied"):
+            L.append(f"  prior-window history supplied: "
+                     f"{s['history_entities']:,} flagged entities; "
+                     f"{s['cases_reclassified']:,} cases")
+            L.append("  reclassified as already-begun")
         L.append("")
 
         if self.headline:
@@ -211,7 +216,19 @@ class AuditResult:
         # g) assumed, not measured
         L.append(rule)
         L.append(b("ASSUMED, NOT MEASURED"))
-        L.append(f"  fraud labels mature in {s['label_delay_days']:g} days "
+        if s.get("history_supplied"):
+            L.append("  cases are bounded by this file plus your supplied "
+                     "history; entities")
+            L.append("  flagged before the window were excluded from "
+                     "first-attempt counts.")
+        else:
+            L.append("  cases are bounded by this file. Any fraudster "
+                     "already active before it")
+            L.append("  starts counts here as a first attempt, so "
+                     "first-attempt stops are an")
+            L.append("  upper bound. A longer window, or --history, "
+                     "tightens it.")
+        L.append(f"  Fraud labels mature in {s['label_delay_days']:g} days "
                  "here; slower maturity shrinks")
         L.append("  every blocklist figure above. Case boundaries come from "
                  "your entity key;")
@@ -255,7 +272,8 @@ def _budget_grid(n_rows: int, days: float, positives: int,
 
 
 def audit(df: pd.DataFrame, label_delay_days: float = 7.0,
-          capacity_per_day: float | None = None) -> AuditResult:
+          capacity_per_day: float | None = None,
+          history_entities: set | None = None) -> AuditResult:
     df = df.sort_values(["t", "transaction_id"]).reset_index(drop=True)
     t = df["t"].to_numpy()
     tb = df["transaction_id"].to_numpy()
@@ -266,6 +284,15 @@ def audit(df: pd.DataFrame, label_delay_days: float = 7.0,
     n, pos = len(df), int(y.sum())
 
     roles = episodes.episode_roles(ent, t, y, tiebreak=tb)
+    # prior-window history: an entity flagged before this window cannot
+    # produce a first attempt inside it. Reclassify, and count it.
+    cases_reclassified = 0
+    hist_mask = np.zeros(n, dtype=bool)
+    if history_entities:
+        hist_mask = pd.Series(ent).isin(history_entities).to_numpy()
+        was_fs = (roles == episodes.ROLE_FIRST_STRIKE) & hist_mask
+        cases_reclassified = int(was_fs.sum())
+        roles = np.where(was_fs, episodes.ROLE_PROPAGATED, roles)
     fs = roles == episodes.ROLE_FIRST_STRIKE
     prop = roles == episodes.ROLE_PROPAGATED
     n_eps = int(fs.sum())
@@ -275,6 +302,8 @@ def audit(df: pd.DataFrame, label_delay_days: float = 7.0,
         delay_days=label_delay_days, prefix="e",
     )
     flag = np.nan_to_num(bl_stats["e_fraud_rate"].to_numpy()) > 0
+    # a prior flag is, by definition, older than any delay in this window
+    flag = flag | hist_mask
     rec_rows = int((flag & (y == 1)).sum())
     rec_amt = float(amt[flag & (y == 1)].sum())
     pos_amt = float(amt[y == 1].sum())
@@ -303,6 +332,9 @@ def audit(df: pd.DataFrame, label_delay_days: float = 7.0,
         "rows_dropped": 0,
         "capacity_stated": capacity_per_day is not None,
         "capacity_default": DEFAULT_CAPACITY,
+        "history_supplied": history_entities is not None,
+        "history_entities": len(history_entities) if history_entities else 0,
+        "cases_reclassified": cases_reclassified,
     }
     blocklist = {
         "flagged_rows": int(flag.sum()),

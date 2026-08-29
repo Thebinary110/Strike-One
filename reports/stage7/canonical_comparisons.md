@@ -23,3 +23,10 @@ single-lane. C5 (698 vs 643) is a *system* comparison, two-lane vs
 single-lane. C4 (2.32×) is a *routing* comparison on one fixed scorer.
 Three different contrasts; three different numbers; never mixed in one
 sentence.
+
+**A numeric collision, documented so nobody infers a link:** the
+standalone-window audit (`strikeone audit --example ieee-cis`, the README
+hero) reports **733** redundant alerts for the bare A2 scorer at 100/day
+within its own window. C5 above also contains a **733** (the
+between-systems difference in wasted alerts, 1,425 vs 692). These are
+unrelated quantities that happen to coincide numerically.
