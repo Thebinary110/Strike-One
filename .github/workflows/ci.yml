@@ -1,0 +1,55 @@
+# CI: every PR and every push to main must prove itself.
+# The suite is clean-clone-safe by design: no dataset, no models, no
+# provider, no key (the provider-independence test skips without one).
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  tests:
+    name: tests (${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: uv sync
+      - run: uv run pytest -q
+
+  package:
+    name: package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv build
+      - run: uvx twine check dist/*
+      # install the built wheel into a bare venv and run it as a user would
+      - run: |
+          uv venv /tmp/smoke
+          uv pip install --python /tmp/smoke/bin/python dist/*.whl
+          /tmp/smoke/bin/strikeone audit --example synthetic | head -20
+          /tmp/smoke/bin/strikeone ai why 11254 --example synthetic --show-evidence | head -5
+
+  tui:
+    name: tui
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: tui/package-lock.json
+      - run: npm ci
+        working-directory: tui
+      - run: npx tsc
+        working-directory: tui

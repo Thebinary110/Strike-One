@@ -1,0 +1,39 @@
+# Release: push a tag vX.Y.Z and this builds the package, publishes it to
+# PyPI (skip-existing, so re-running a tag whose version is already on
+# PyPI is a no-op rather than a failure) and creates the GitHub Release
+# with the artifacts attached.
+#
+# Credentials: repository secret PYPI_API_TOKEN (Settings -> Secrets and
+# variables -> Actions). Upgrade path: PyPI "trusted publishing" (OIDC)
+# removes the token entirely - configure it on pypi.org under the
+# project's Publishing settings, then swap the password line for
+# permissions: id-token: write.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      # the tag must match the packaged version - refuse to ship a mismatch
+      - run: |
+          V=$(python3 -c "import tomllib;print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          test "v$V" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME != pyproject version v$V"; exit 1; }
+      - run: uv build
+      - run: uvx twine check dist/*
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          skip-existing: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
