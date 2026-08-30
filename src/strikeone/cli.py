@@ -161,6 +161,13 @@ def cmd_policy(args) -> int:
 
 def cmd_tui(args) -> int:
     tui_dir = config.REPO_ROOT / "tui"
+    if not tui_dir.exists():
+        print("the TUI lives in the repo, not the PyPI package (the Python "
+              "core you have is fully functional without it):\n"
+              "  git clone https://github.com/Thebinary110/Strike-One\n"
+              "  cd Strike-One/tui && npm install && npx tsc",
+              file=sys.stderr)
+        return 2
     node = shutil.which("node")
     if not node:
         print("the TUI needs Node 18+ (the Python core does not). "

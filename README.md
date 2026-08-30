@@ -45,16 +45,24 @@ narrow: **a measurement of how much label propagation bends model
 labelled transaction, shown under a sealed holdout with pre-registered
 predictions), and **the corrected evaluation packaged as a tool that runs
 on your export**. Full genealogy, including the metric-inversion
-literature we run backwards: [`reports/PRIOR_ART.md`](reports/PRIOR_ART.md).
+literature we run backwards: [`reports/PRIOR_ART.md`](https://github.com/Thebinary110/Strike-One/blob/main/reports/PRIOR_ART.md).
 
 ## Install
+
+```bash
+pip install strikeone            # the Python core: check/audit/route/policy/ai
+```
+
+Or from source (needed for the TUI and the frozen IEEE-CIS study):
 
 ```bash
 git clone https://github.com/Thebinary110/Strike-One && cd Strike-One
 pip install -e .          # or: uv sync
 ```
 
-The TUI additionally needs Node 18+: `cd tui && npm install && npx tsc`.
+Extras: `pip install "strikeone[db]"` for database-URL sources,
+`"strikeone[research]"` to reproduce the study. The TUI additionally
+needs the repo and Node 18+: `cd tui && npm install && npx tsc`.
 
 ## Try it in 30 seconds
 
@@ -139,8 +147,8 @@ first-hit recall — on such data the corrected metric has nothing to add.
 
 ## What the sealed holdout said
 
-The study behind the tool (full narrative: [`FINDINGS.md`](FINDINGS.md),
-every figure: [`reports/stage7/canonical_comparisons.md`](reports/stage7/canonical_comparisons.md)):
+The study behind the tool (full narrative: [`FINDINGS.md`](https://github.com/Thebinary110/Strike-One/blob/main/FINDINGS.md),
+every figure: [`reports/stage7/canonical_comparisons.md`](https://github.com/Thebinary110/Strike-One/blob/main/reports/stage7/canonical_comparisons.md)):
 
 - **The distortion is real and selects the wrong model.** Adding the
   entity-history features everyone adds buys +0.17 AP while *reducing*
@@ -204,7 +212,7 @@ Useful flags: `--capacity` (your real reviews/day) · `--history file`
 (entities flagged before this window, tightens first-hit counts from
 upper bound to measured) · `--json` (pipe anywhere, CI-friendly).
 Readers: parquet, CSV, or a database URL. Worked mappings, including a
-PSP-shaped disputes export: [`examples/`](examples/).
+PSP-shaped disputes export: [`examples/`](https://github.com/Thebinary110/Strike-One/blob/main/examples/).
 
 ## The terminal UI
 
@@ -213,7 +221,7 @@ strikeone tui --help          # usage + all keys
 strikeone tui --example ieee-cis
 ```
 
-<img src="reports/stage6/tui_audit.png" width="820" alt="Strike One TUI, audit panel">
+<img src="https://raw.githubusercontent.com/Thebinary110/Strike-One/main/reports/stage6/tui_audit.png" width="820" alt="Strike One TUI, audit panel">
 
 Six panels (CONNECT, AUDIT, ROUTE, ECONOMICS, STREAM, CASE), fully
 keyboard-driven, runs offline over stdio to the local Python core.
@@ -233,7 +241,7 @@ strikeone ai compare 21349  --example synthetic   # two systems, one txn
 ```
 
 What `why` prints, verbatim (local model, nothing installed for the
-judge — this exact output is committed under [`examples/ai/`](examples/ai/)):
+judge — this exact output is committed under [`examples/ai/`](https://github.com/Thebinary110/Strike-One/blob/main/examples/ai/)):
 
 ```text
 STRIKE ONE AI  WHY THIS DECISION  (why 11254)
@@ -276,7 +284,7 @@ How it stays honest:
   OpenRouter key plus local Ollama and asserts the validator passes for
   every one. Recorded run: **citation validity 100% of 40 claims across
   6 models from 6 families**
-  ([`examples/ai/independence_run.txt`](examples/ai/independence_run.txt)).
+  ([`examples/ai/independence_run.txt`](https://github.com/Thebinary110/Strike-One/blob/main/examples/ai/independence_run.txt)).
   It needs `OPENROUTER_API_KEY` and skips cleanly without it.
 
 Providers — one interface, two adapters:
@@ -352,8 +360,8 @@ number reported in this repo's results.
 - The study behind the method: a sealed holdout with **two logged
   accesses, each against a pre-registered plan committed beforehand**
   — including the predictions that missed, self-caught bugs documented,
-  negative results published. Read [`FINDINGS.md`](FINDINGS.md) and
-  [`reports/`](reports/).
+  negative results published. Read [`FINDINGS.md`](https://github.com/Thebinary110/Strike-One/blob/main/FINDINGS.md) and
+  [`reports/`](https://github.com/Thebinary110/Strike-One/blob/main/reports/).
 
 ## Data and license
 
