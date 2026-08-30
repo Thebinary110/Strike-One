@@ -35,5 +35,9 @@ jobs:
           skip-existing: true
       - uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
+          # explicit globs: uv writes a .gitignore into dist/, which a bare
+          # dist/* would upload as a release asset
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
           generate_release_notes: true
