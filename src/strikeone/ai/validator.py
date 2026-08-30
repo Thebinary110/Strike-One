@@ -58,6 +58,39 @@ def _value_matches(evidence_value, quoted: str) -> bool:
 
 NUM_TOKEN_RE = re.compile(r"\d[\d,]*(?:\.\d+)?")
 
+# Decision-bearing words are factual claims even without digits ("the
+# block should be lifted", "the transaction is legitimate"). They are
+# validated like numbers: in a CLAIM sentence they must be vouched for by
+# the CITED evidence item itself (its feature or value carries the word,
+# e.g. decision=BLOCK vouches "blocked"); in a SUMMARY they are dropped
+# outright. Word-boundary forms only - "blocklist" is a system component,
+# not a decision, and does not match.
+DECISION_RE = re.compile(
+    r"\b(approv(?:e|es|ed|ing|al)|block(?:ed|s|ing)?|legitimate(?:ly)?|"
+    r"fraudulent(?:ly)?|lift(?:ed|s|ing)?|den(?:y|ies|ied|ying)|"
+    r"step[\s-]?up|declin(?:e|es|ed|ing))\b", re.IGNORECASE)
+
+
+def _normalize(text: str) -> str:
+    return re.sub(r"[^a-z]", "", text.lower())
+
+
+_DECISION_STEMS = ("approv", "block", "legitimate", "fraudulent", "lift",
+                   "den", "stepup", "declin")
+
+
+def _unvouched_decision_word(sentence: str, item: dict) -> str | None:
+    """A decision-bearing word in the sentence whose STEM the cited
+    evidence item's own feature/value does not carry ("blocked" is vouched
+    by decision=BLOCK; "approved" is not vouched by a prior-count item)."""
+    vouched = _normalize(str(item["feature"]) + str(item["value"]))
+    for m in DECISION_RE.finditer(sentence):
+        word = _normalize(m.group(0))
+        stem = next(s for s in _DECISION_STEMS if word.startswith(s))
+        if stem not in vouched:
+            return m.group(0)
+    return None
+
 
 def _numeric_pool(contract: dict) -> list:
     """Every number the contract vouches for: evidence values, baselines,
@@ -110,6 +143,12 @@ def validate(raw_text: str, contract: dict) -> Validated:
                     f"{sid}: sentence contains a number the evidence does "
                     f"not vouch for ({bad})")
                 continue
+            badw = _unvouched_decision_word(sentence, item)
+            if badw is not None:
+                out.dropped.append(
+                    f"{sid}: decision-bearing word {badw!r} is not vouched "
+                    "for by the cited evidence")
+                continue
             out.valid_claims += 1
             out.lines.append(f"{sentence} [{sid}]")
             continue
@@ -118,6 +157,12 @@ def validate(raw_text: str, contract: dict) -> Validated:
             if re.search(r"\d", m.group(1)):
                 out.dropped.append(
                     "summary line contained digits (numbers must be CLAIMs)")
+                continue
+            dw = DECISION_RE.search(m.group(1))
+            if dw:
+                out.dropped.append(
+                    f"summary asserted a decision ({dw.group(0)!r}) without "
+                    "a citation (decisions must be CLAIMs)")
                 continue
             out.lines.append(m.group(1))
             continue

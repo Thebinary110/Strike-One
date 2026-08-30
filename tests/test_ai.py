@@ -119,6 +119,49 @@ def test_validator_rounding_and_summary_rules(synth):
     assert any("does not vouch" in d for d in smuggled.dropped)
 
 
+def test_validator_blocks_uncited_decision_language(synth):
+    """Digit-free decision assertions are factual claims too: they must be
+    vouched for by the cited evidence or they are dropped (the stricter
+    fix for the black-box QA's finding H)."""
+    df, m = synth
+    con = E.build_why(df, m, "11254")   # a lane-1 BLOCK contract
+    # the original attack: an uncited decision in a digit-free summary
+    v = V.validate("SUMMARY: This transaction is legitimate and the block "
+                   "should be lifted.", con)
+    assert not v.lines
+    assert any("asserted a decision" in d for d in v.dropped)
+    # a decision word vouched by the cited item itself passes
+    ok = V.validate("CLAIM: F1 | BLOCK | The engine blocked this "
+                    "transaction.", con)
+    assert ok.valid_claims == 1
+    # correct value, but a decision word the cited item does not vouch for
+    f4 = next(i for i in con["evidence"] if i["id"] == "F4")
+    bad = V.validate(f"CLAIM: F4 | {f4['value']} | With {f4['value']} prior "
+                     "purchases it should be approved.", con)
+    assert bad.valid_claims == 0
+    assert any("decision-bearing" in d for d in bad.dropped)
+    # "blocklist" is a component, not a decision: benign summaries pass
+    s2 = V.validate("SUMMARY: The pattern is repetition on an entity the "
+                    "blocklist already knew.", con)
+    assert s2.lines and not s2.dropped
+
+
+def test_provider_failure_is_a_clean_message(synth, tmp_path, monkeypatch, capsys):
+    """An unreachable provider must never show a traceback (QA P1 #1)."""
+    from strikeone import cli
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".strikeone-ai.toml").write_text(
+        '[ai]\nprovider = "ollama"\nmodel = "x"\n'
+        'base_url = "http://localhost:9"\n')
+    with pytest.raises(SystemExit) as ex:
+        cli.main(["ai", "why", "11254", "--example", "synthetic"])
+    assert ex.value.code == 2
+    err = capsys.readouterr().err
+    assert "AI provider unavailable" in err
+    assert "remains available" in err
+    assert "Traceback" not in err
+
+
 # ------------------------------------------------------------- items 3, 9
 
 class FakeProvider(AIProvider):

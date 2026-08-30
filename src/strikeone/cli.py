@@ -1,7 +1,7 @@
 """The strikeone command line.
 
   strikeone check   validate a dataset against the input contract
-  strikeone audit   the corrected evaluation, on your labelled data
+  strikeone audit   the corrected (first-hit) evaluation, on your data
   strikeone route   wrap any scorer with the two-lane routing
   strikeone policy  cost-derived {approve, step-up, block} recommendations
   strikeone tui     the terminal UI (needs Node 18+; core never does)
@@ -239,8 +239,15 @@ def cmd_ai(args) -> int:
               "--show-evidence to print the deterministic evidence "
               "contract with no model at all.", file=sys.stderr)
         return 2
-    res = commands.run(args.ai_cmd, df, m, args.target, cfg.build(),
-                       capacity_per_day=int(args.capacity))
+    from strikeone.ai.providers import ProviderError
+    try:
+        res = commands.run(args.ai_cmd, df, m, args.target, cfg.build(),
+                           capacity_per_day=int(args.capacity))
+    except ProviderError as e:
+        print(f"\u2717 AI provider unavailable\n\n{e}\n\n"
+              "Core Strike One functionality (audit / route / policy / "
+              "check) remains available.", file=sys.stderr)
+        return 2
     if args.json:
         v = res["validated"]
         print(json.dumps({
@@ -268,14 +275,14 @@ def main(argv=None) -> None:
     ap = argparse.ArgumentParser(
         prog="strikeone",
         description="Bring-your-own-scorer fraud routing and the corrected "
-                    "(first-strike) evaluation. Your data never leaves the "
+                    "(first-hit) evaluation. Your data never leaves the "
                     "machine.",
     )
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     for name, fn, doc in [
         ("check", cmd_check, "validate a dataset against the input contract"),
-        ("audit", cmd_audit, "first-strike recall vs your headline metric, "
+        ("audit", cmd_audit, "first-hit recall vs your headline metric, "
                              "redundancy, blocklist recovery"),
         ("route", cmd_route, "two-lane routing around any scorer, with "
                              "measured lift"),

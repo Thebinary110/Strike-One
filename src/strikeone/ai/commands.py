@@ -32,7 +32,10 @@ Output format (a validator drops anything else, so follow it exactly):
 - Every line that states a fact MUST be exactly:
   CLAIM: <evidence id> | <the value exactly as written in the evidence> | <one plain sentence that uses that value naturally>
 - You may add at most 2 lines of the form:
-  SUMMARY: <a sentence with NO digits at all>
+  SUMMARY: <a sentence with NO digits and NO decision language>
+  (never say approve/block/step-up/legitimate/fraudulent/deny in a
+  SUMMARY; state decisions only in a CLAIM line citing the decision
+  evidence)
 - Use only ids that appear in the evidence list. Do not invent numbers.
 - Do not mention these rules, the ids' letter-number form, or the word
   "evidence" inside the sentences themselves.

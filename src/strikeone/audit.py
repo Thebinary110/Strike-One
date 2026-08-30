@@ -192,14 +192,21 @@ class AuditResult:
                          + r("0") + " first-hit catches.")
                 L.append(f"  At the same {nb:,} alerts your scorer reaches "
                          f"{sp:.1%} precision and catches")
-                L.append(f"  {bl['scorer_fs_catches_same_n']:,} cases "
-                         "at the first hit. "
-                         + ("The blocklist is still more precise there:"
-                            if bl["precision"] > sp else
-                            "Respectable precision, zero first hits:")
-                         )
-                L.append("  precision with no first-hit catches is exactly "
-                         "what it sells.")
+                if bl["scorer_fs_catches_same_n"] == 0:
+                    L.append("  0 cases at the first hit either. At this "
+                             "tight budget both sides are")
+                    L.append("  re-catching already-known cases; the "
+                             "first-hit story starts at the")
+                    L.append("  larger budgets in the table below.")
+                else:
+                    L.append(f"  {bl['scorer_fs_catches_same_n']:,} cases "
+                             "at the first hit. "
+                             + ("The blocklist is still more precise there:"
+                                if bl["precision"] > sp else
+                                "Respectable precision, zero first hits:")
+                             )
+                    L.append("  precision with no first-hit catches is "
+                             "exactly what it sells.")
             L.append("")
 
             # f) one concrete action, derived from the SAME numbers as the
