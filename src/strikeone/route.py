@@ -7,7 +7,7 @@ Lane 1: entity has a confirmed fraud at least `label_delay_days` old
 Lane 2: everything else -> ranked by the caller's score.
 
 With labels present, the measured lift across the capacity curve is
-reported: first-strike recall with and without the lane. This is "the
+reported: first-hit recall with and without the lane. This is "the
 routing protects any scorer" as a tool rather than a claim.
 """
 

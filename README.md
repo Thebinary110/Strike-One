@@ -8,7 +8,7 @@ episode-aware evaluation that selected it. Swap in your own scorer.**
 [![PyPI](https://img.shields.io/pypi/v/strikeone)](https://pypi.org/project/strikeone/)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB)
 ![License](https://img.shields.io/badge/license-Apache--2.0-green)
-![Tests](https://img.shields.io/badge/tests-65%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-67%20passing-brightgreen)
 ![Offline](https://img.shields.io/badge/network%20calls-zero-black)
 
 </div>
@@ -272,9 +272,12 @@ How it stays honest:
   never holdout data (asserted by test).
 - **The citation validator.** The model must emit structured
   `CLAIM: <id> | <value> | <sentence>` lines. Each cited value is
-  re-read from the contract; a mismatch, an unknown id, or any number
-  the contract does not vouch for drops the line. Every output reports
-  its validity rate and the evidence hash it narrates.
+  re-read from the contract; a mismatch, an unknown id, any number the
+  contract does not vouch for, or any decision-bearing word
+  (approve/block/step-up/legitimate/fraudulent/…) the cited evidence
+  does not itself carry drops the line — digit-free assertions cannot
+  smuggle a verdict either. Every output reports its validity rate and
+  the evidence hash it narrates.
 - **Deterministic routing.** `why`/`timeline`/`compare` map to evidence
   builders in a plain dict; the model never chooses a tool. There is
   deliberately no `/challenge`, `/investigate` or `/simulate` — a model
