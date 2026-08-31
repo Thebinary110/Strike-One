@@ -163,6 +163,11 @@ def pit_delayed_label_stats(
     A prior transaction's label counts only if it is at least `delay_days`
     old at time t (time <= t - delay). Returns the labeled-prior count and
     the fraud rate among them (NaN when no labeled prior rows exist).
+
+    delay_days == 0 means labels are knowable immediately, but a row can
+    still never see its own label or a simultaneous row's: the boundary
+    becomes strictly-prior (time < t), otherwise every fraud row would
+    flag itself and a blocklist would circularly "recover" 100% of fraud.
     """
     n = len(np.asarray(time))
     order, ords, tp, null_key = _sorted_space(key, time, tiebreak)
@@ -173,7 +178,10 @@ def pit_delayed_label_stats(
 
     delay = np.int64(delay_days * config.SECONDS_PER_DAY)
     q = ords * _OFFSET + (t_sorted - delay)
-    right = np.searchsorted(tp, q, side="right")
+    # delay > 0: rows with time <= t - delay (unchanged; the frozen 7-day
+    # research path). delay <= 0: strictly prior (side="left"), so a row
+    # never counts itself or a same-timestamp peer as known history.
+    right = np.searchsorted(tp, q, side="right" if delay > 0 else "left")
     right = np.maximum(right, starts)
     cnt = (right - starts).astype(np.float64)
     frauds = prefix_y[right] - prefix_y[starts]

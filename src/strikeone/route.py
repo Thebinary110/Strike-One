@@ -32,7 +32,9 @@ class RouteResult:
     decisions: pd.DataFrame | None = None
 
     def to_json(self) -> str:
-        return json.dumps({"lane1": self.lane1, "curve": self.curve},
+        from strikeone.contract import json_safe
+        return json.dumps(json_safe({"lane1": self.lane1,
+                                     "curve": self.curve}),
                           indent=2, default=float)
 
     def to_text(self) -> str:

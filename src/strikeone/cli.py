@@ -132,6 +132,10 @@ hero shows it.""")
 
 def cmd_route(args) -> int:
     df, m = _load(args)
+    rep = contract.check(df, m, for_audit=True)
+    if not rep.ok:
+        print(rep.to_text(), file=sys.stderr)
+        return 2
     bl = None
     if args.blocklist:
         bl = set(Path(args.blocklist).read_text().split())
@@ -146,6 +150,10 @@ def cmd_route(args) -> int:
 
 def cmd_policy(args) -> int:
     df, m = _load(args)
+    rep = contract.check(df, m, for_audit=False)
+    if not rep.ok:
+        print(rep.to_text(), file=sys.stderr)
+        return 2
     params = {}
     for k in ("m", "a", "e", "c_h", "s"):
         v = getattr(args, k if k != "c_h" else "ch")

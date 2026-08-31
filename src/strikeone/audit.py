@@ -71,10 +71,11 @@ class AuditResult:
     sentence: str = ""
 
     def to_json(self) -> str:
+        from strikeone.contract import json_safe
         return json.dumps(
-            {"stats": self.stats, "blocklist": self.blocklist,
-             "headline": self.headline, "budgets": self.budgets,
-             "sentence": self.sentence},
+            json_safe({"stats": self.stats, "blocklist": self.blocklist,
+                       "headline": self.headline, "budgets": self.budgets,
+                       "sentence": self.sentence}),
             indent=2, default=float,
         )
 
@@ -187,9 +188,10 @@ class AuditResult:
             if bl.get("comparison_n"):
                 nb = bl["comparison_n"]
                 sp = bl["scorer_precision_same_n"]
+                fsb = bl["first_strike_catches"]
                 L.append(f"  by flagging {nb:,} transactions at "
                          f"{bl['precision']:.1%} precision, with "
-                         + r("0") + " first-hit catches.")
+                         + r(f"{fsb:,}") + " first-hit catches.")
                 L.append(f"  At the same {nb:,} alerts your scorer reaches "
                          f"{sp:.1%} precision and catches")
                 if bl["scorer_fs_catches_same_n"] == 0:
@@ -198,15 +200,25 @@ class AuditResult:
                     L.append("  re-catching already-known cases; the "
                              "first-hit story starts at the")
                     L.append("  larger budgets in the table below.")
-                else:
+                elif bl["precision"] > sp:
                     L.append(f"  {bl['scorer_fs_catches_same_n']:,} cases "
-                             "at the first hit. "
-                             + ("The blocklist is still more precise there:"
-                                if bl["precision"] > sp else
-                                "Respectable precision, zero first hits:")
-                             )
+                             "at the first hit. The blocklist is still "
+                             "more precise there:")
                     L.append("  precision with no first-hit catches is "
                              "exactly what it sells.")
+                elif bl["precision"] >= 0.2:
+                    L.append(f"  {bl['scorer_fs_catches_same_n']:,} cases "
+                             "at the first hit. Respectable precision, "
+                             f"{fsb:,} first hits:")
+                    L.append("  precision with no first-hit catches is "
+                             "exactly what it sells.")
+                else:
+                    L.append(f"  {bl['scorer_fs_catches_same_n']:,} cases "
+                             "at the first hit. At "
+                             f"{bl['precision']:.1%} precision the "
+                             "blocklist would mostly flag")
+                    L.append("  good customers here; it is not selling "
+                             "much of anything on this data.")
             L.append("")
 
             # f) one concrete action, derived from the SAME numbers as the
@@ -331,6 +343,10 @@ def _budget_grid(n_rows: int, days: float, positives: int,
 def audit(df: pd.DataFrame, label_delay_days: float = 7.0,
           capacity_per_day: float | None = None,
           history_entities: set | None = None) -> AuditResult:
+    if capacity_per_day is not None and not capacity_per_day > 0:
+        raise ValueError(
+            f"--capacity must be a positive number of reviews/day, got "
+            f"{capacity_per_day:g}. Nothing is assumed in its place.")
     df = df.sort_values(["t", "transaction_id"]).reset_index(drop=True)
     t = df["t"].to_numpy()
     tb = df["transaction_id"].to_numpy()
@@ -374,7 +390,8 @@ def audit(df: pd.DataFrame, label_delay_days: float = 7.0,
         span_text = f"{days:.1f} days (relative timestamps)"
 
     resolution = float(1 - pd.Series(ent).astype(str)
-                       .str.contains("nan").mean())
+                       .str.contains(r"(?:^|_)nan(?:_|$)", regex=True)
+                       .mean())
     stickiness = label_stickiness(ent, t, y, tb)
 
     stats = {

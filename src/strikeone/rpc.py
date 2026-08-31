@@ -194,7 +194,8 @@ class Session:
             if legit:  # the story needs quiet purchases before the strike
                 good = good[good["n"] >= good["frauds"] + 2]
             if resolved:
-                good = good[~good.index.astype(str).str.contains("nan")]
+                good = good[~good.index.astype(str)
+                            .str.contains(r"(?:^|_)nan(?:_|$)", regex=True)]
             if len(good) >= 5:
                 break
         good = good.sort_values(["frauds", "n"], ascending=False).head(10)
@@ -234,7 +235,8 @@ def main():
         except Exception as e:  # noqa: BLE001 — surfaced to the TUI
             out = {"id": req.get("id") if isinstance(req, dict) else None,
                    "error": str(e)}
-        sys.stdout.write(json.dumps(out, default=float) + "\n")
+        from strikeone.contract import json_safe
+        sys.stdout.write(json.dumps(json_safe(out), default=float) + "\n")
         sys.stdout.flush()
 
 
