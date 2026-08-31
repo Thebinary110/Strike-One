@@ -246,3 +246,29 @@ def test_stickiness_gates_the_headline():
     rep = contract.check(contract.apply_mapping(f, m), m)
     assert any("entity-independent" in w or "not be headlined" in w
                for w in rep.warnings)
+
+
+def test_top_level_api_and_version_come_from_metadata():
+    """PyPI 1.0.1 shipped __version__ = "0.1.0" and an empty namespace.
+    Version must come from installed metadata (single source of truth:
+    pyproject), and the documented API must be importable from the top."""
+    import importlib.metadata
+
+    import strikeone
+
+    assert strikeone.__version__ == importlib.metadata.version("strikeone")
+    assert strikeone.__version__ != "0.1.0"
+    for name in ("audit", "route", "policy", "check",
+                 "Mapping", "apply_mapping", "read_source", "ContractError"):
+        assert name in strikeone.__all__
+        assert hasattr(strikeone, name)
+    # the exported audit is the real engine, end to end
+    from strikeone import examples
+    raw, m = examples.resolve("synthetic")
+    res = strikeone.audit(strikeone.apply_mapping(raw, m),
+                          label_delay_days=m.label_delay_days)
+    assert res.stats["rows"] == len(raw)
+    # submodules stay importable alongside the same-named exports
+    from strikeone.audit import DEFAULT_CAPACITY  # noqa: F401
+    from strikeone.route import route as route_fn
+    assert callable(route_fn)

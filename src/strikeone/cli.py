@@ -21,10 +21,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-from strikeone import audit as audit_mod
+from strikeone.audit import audit as run_audit
 from strikeone import config, contract, examples
 from strikeone import policy_engine
-from strikeone import route as route_mod
+from strikeone.route import route as run_route
 
 
 def _add_source_args(p: argparse.ArgumentParser) -> None:
@@ -105,7 +105,7 @@ def cmd_audit(args) -> int:
             hist = set(hdf[col].astype(str))
         else:
             hist = set(hp.read_text().split())
-    res = audit_mod.audit(df, label_delay_days=m.label_delay_days,
+    res = run_audit(df, label_delay_days=m.label_delay_days,
                           capacity_per_day=args.capacity,
                           history_entities=hist)
     color = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
@@ -135,7 +135,7 @@ def cmd_route(args) -> int:
     bl = None
     if args.blocklist:
         bl = set(Path(args.blocklist).read_text().split())
-    res = route_mod.route(df, label_delay_days=m.label_delay_days,
+    res = run_route(df, label_delay_days=m.label_delay_days,
                           blocklist_entities=bl)
     print(res.to_json() if args.json else res.to_text())
     if args.out:

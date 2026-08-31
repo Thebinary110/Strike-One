@@ -16,11 +16,11 @@ import sys
 import numpy as np
 import pandas as pd
 
-from strikeone import audit as audit_mod
+from strikeone.audit import audit as run_audit
 from strikeone import contract, entity as ent_mod, episodes, examples
 from strikeone import metrics as M
 from strikeone import policy_engine
-from strikeone import route as route_mod
+from strikeone.route import route as run_route
 
 
 class Session:
@@ -122,7 +122,7 @@ class Session:
     def audit(self, _p):
         self._need()
         if self.audit_res is None:
-            self.audit_res = audit_mod.audit(
+            self.audit_res = run_audit(
                 self.df, label_delay_days=self.mapping.label_delay_days)
         r = self.audit_res
         return {"stats": r.stats, "blocklist": r.blocklist,
@@ -131,7 +131,7 @@ class Session:
 
     def route_curve(self, _p):
         self._need()
-        res = route_mod.route(self.df,
+        res = run_route(self.df,
                               label_delay_days=self.mapping.label_delay_days)
         return {"lane1": res.lane1, "curve": res.curve}
 
