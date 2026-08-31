@@ -13,12 +13,13 @@ same API:
 truth: pyproject.toml), so it cannot drift from the PyPI release again.
 """
 
-from importlib.metadata import PackageNotFoundError, version as _version
+import importlib.metadata as _im
 
 try:
-    __version__ = _version("strikeone")
-except PackageNotFoundError:      # running from a source tree, uninstalled
+    __version__ = _im.version("strikeone")
+except _im.PackageNotFoundError:  # running from a source tree, uninstalled
     __version__ = "0.0.0+source"
+del _im
 
 from strikeone.audit import audit
 from strikeone.contract import (

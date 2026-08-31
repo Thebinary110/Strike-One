@@ -52,8 +52,14 @@ class RouteResult:
                      "(same scorer, lane on vs off)")
             L.append("  alerts/day   lane OFF   lane ON     lift")
             for r in self.curve:
+                if r["lift"] is not None:
+                    disp = f"{r['lift']:.2f}x"
+                elif r["fs_recall_on"] > 0:
+                    disp = "from 0"   # plain run caught none; no finite ratio
+                else:
+                    disp = "-"        # 0 -> 0: nothing to measure yet
                 L.append(f"  {r['per_day']:>9,}   {r['fs_recall_off']:>7.1%}"
-                         f"   {r['fs_recall_on']:>7.1%}   {r['lift']:>5.2f}x")
+                         f"   {r['fs_recall_on']:>7.1%}   {disp:>6}")
         return "\n".join(L)
 
 
@@ -114,7 +120,10 @@ def route(
                 res.curve.append({
                     "per_day": per_day, "budget": b,
                     "fs_recall_off": r_off, "fs_recall_on": r_on,
-                    "lift": (r_on / r_off) if r_off > 0 else float("inf"),
+                    # 0/0 is undefined, not infinity; x/0 with x>0 is
+                    # "caught some where the plain run caught none", which
+                    # no finite ratio expresses. Both are None in JSON.
+                    "lift": (r_on / r_off) if r_off > 0 else None,
                     "primary": per_day == primary,
                 })
     return res

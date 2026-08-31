@@ -8,7 +8,7 @@ episode-aware evaluation that selected it. Swap in your own scorer.**
 [![PyPI](https://img.shields.io/pypi/v/strikeone)](https://pypi.org/project/strikeone/)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB)
 ![License](https://img.shields.io/badge/license-Apache--2.0-green)
-![Tests](https://img.shields.io/badge/tests-74%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-76%20passing-brightgreen)
 ![Offline](https://img.shields.io/badge/network%20calls-zero-black)
 
 </div>
