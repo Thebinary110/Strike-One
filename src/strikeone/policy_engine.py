@@ -44,9 +44,10 @@ class PolicyResult:
     decisions: pd.DataFrame | None = None
 
     def to_json(self) -> str:
-        return json.dumps({"params": self.params, "mix": self.mix,
-                           "costs": self.costs, "grid": self.grid,
-                           "worst_corner": self.worst_corner},
+        from strikeone.contract import json_safe
+        return json.dumps(json_safe({"params": self.params, "mix": self.mix,
+                                     "costs": self.costs, "grid": self.grid,
+                                     "worst_corner": self.worst_corner}),
                           indent=2, default=float)
 
     def to_text(self) -> str:
@@ -96,6 +97,17 @@ def policy(df: pd.DataFrame, params: dict | None = None,
         )
     prm = _clamp(params or {})
     pcol = df["p"].to_numpy(dtype=float)
+    if np.isnan(pcol).any():
+        raise ValueError(
+            f"{int(np.isnan(pcol).sum()):,} rows have a missing p; policy "
+            "prices every row and refuses to guess. Fill or filter first.")
+    if pcol.min() < -1e-9 or pcol.max() > 1 + 1e-9:
+        raise ValueError(
+            f"p ranges [{pcol.min():.3g}, {pcol.max():.3g}] - that is not "
+            "a calibrated probability. A raw model score priced as a "
+            "probability produces nonsense costs; calibrate on a "
+            "chronologically earlier slice first (isotonic or Platt), "
+            "then map the calibrated column with --map p=<column>.")
     amt = df["amount"].to_numpy(dtype=float)
     ec = M.expected_cost_matrix(pcol, amt, prm)
     act = ec.argmin(axis=1)

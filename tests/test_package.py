@@ -272,3 +272,112 @@ def test_top_level_api_and_version_come_from_metadata():
     from strikeone.audit import DEFAULT_CAPACITY  # noqa: F401
     from strikeone.route import route as route_fn
     assert callable(route_fn)
+
+
+# ---------------- external QA round 2: seven reported bugs ----------------
+
+def test_delay_zero_is_not_circular():
+    """--delay 0: a row's own label must not flag its own entity at its
+    own decision time (was: side='right' included the row itself, so the
+    blocklist circularly 'recovered 100.0%' of fraud)."""
+    f = frame().assign(bad=[0, 1, 1, 0, 1, 0])
+    m = contract.Mapping(
+        columns={"transaction_id": "txid", "timestamp": "when",
+                 "amount": "amt", "entity": ["who"], "label": "bad",
+                 "score": "s"},
+        label_delay_days=0.0, source="test")
+    df = contract.apply_mapping(f, m)
+    r = audit(df, label_delay_days=0.0)
+    assert r.blocklist["recovered_share"] < 1.0
+    # flagged => strictly-prior fraud => role is propagated, never first
+    # hit: the blocklist can still not catch first hits, and the prose
+    # prints the COMPUTED count (was: JSON said 38, prose hardcoded "0")
+    assert r.blocklist["first_strike_catches"] == 0
+    txt = r.to_text()
+    if "first-hit catches." in txt:
+        assert f"{r.blocklist['first_strike_catches']:,} "                "first-hit catches." in txt
+
+
+def test_zero_fraud_is_refused_and_json_is_valid():
+    """No positive labels -> check refuses (nothing to audit) instead of
+    emitting ROC-AUC NaN; and no to_json output ever contains bare NaN
+    (invalid JSON for jq / JSON.parse)."""
+    f = frame().assign(bad=0)
+    m = contract.Mapping(
+        columns={"transaction_id": "txid", "timestamp": "when",
+                 "amount": "amt", "entity": ["who"], "label": "bad",
+                 "score": "s"},
+        label_delay_days=7.0, source="test")
+    rep = contract.check(contract.apply_mapping(f, m), m)
+    assert not rep.ok
+    assert any("no fraud to audit" in e for e in rep.errors)
+    assert contract.json_safe(float("nan")) is None
+    assert contract.json_safe({"a": [1.0, float("inf")]}) == {"a": [1.0, None]}
+    df, _ = mapped()
+    assert "NaN" not in audit(df, label_delay_days=7.0).to_json()
+
+
+def test_entity_named_fernando_is_not_a_null_component():
+    """'nan' must match whole pooled components, not substrings."""
+    f = frame().assign(who=["fernando", "fernando", "fernando",
+                            "hernandez", "anand", "anand"])
+    m = contract.Mapping(
+        columns={"transaction_id": "txid", "timestamp": "when",
+                 "amount": "amt", "entity": ["who"], "label": "bad",
+                 "score": "s"},
+        label_delay_days=7.0, source="test")
+    f = f.assign(bad=[0, 1, 0, 1, 0, 1])
+    df = contract.apply_mapping(f, m)
+    assert audit(df, label_delay_days=7.0).stats["entity_resolution"] == 1.0
+    rep = contract.check(df, m)
+    assert rep.stats["entity_rows_with_null_component"].startswith("0.0%")
+    # a genuinely pooled component still counts
+    f2 = f.assign(who=["fernando", None, "fernando",
+                       "hernandez", "anand", "anand"])
+    df2 = contract.apply_mapping(f2, m)
+    assert audit(df2, label_delay_days=7.0).stats["entity_resolution"] < 1.0
+
+
+def test_capacity_zero_is_refused_not_silently_replaced():
+    df, _ = mapped()
+    for bad_cap in (0, -5):
+        with pytest.raises(ValueError, match="positive"):
+            audit(df, label_delay_days=7.0, capacity_per_day=bad_cap)
+
+
+def test_route_and_policy_get_the_same_contract_gate(tmp_path, monkeypatch, capsys):
+    """Duplicate transaction ids must refuse in route/policy exactly as in
+    audit (was: degenerate 'infx' lift tables instead of refusal)."""
+    from strikeone import cli
+    f = frame().assign(bad=[0, 1, 0, 1, 0, 1], txid=[1, 1, 2, 2, 3, 3])
+    src = tmp_path / "dup.csv"
+    f.to_csv(src, index=False)
+    monkeypatch.chdir(tmp_path)
+    maps = ["--map", "transaction_id=txid", "--map", "timestamp=when",
+            "--map", "amount=amt", "--map", "entity=who",
+            "--map", "label=bad", "--map", "score=s"]
+    for cmd in ("route", "policy"):
+        with pytest.raises(SystemExit) as ex:
+            cli.main([cmd, str(src), *maps])
+        assert ex.value.code == 2, f"{cmd} must refuse duplicated ids"
+        assert "duplicated" in capsys.readouterr().err
+
+
+def test_policy_refuses_uncalibrated_p():
+    """p > 1 is not a probability; policy must refuse loudly, not price
+    nonsense (was: silently recommended a mix costing more than
+    approve-all)."""
+    from strikeone.policy_engine import policy
+    f = frame().assign(bad=[0, 1, 0, 1, 0, 1], praw=[0.1, 1.7, 0.2, 0.9,
+                                                     0.05, 1.2])
+    m = contract.Mapping(
+        columns={"transaction_id": "txid", "timestamp": "when",
+                 "amount": "amt", "entity": ["who"], "label": "bad",
+                 "p": "praw"},
+        label_delay_days=7.0, source="test")
+    df = contract.apply_mapping(f, m)
+    with pytest.raises(ValueError, match="not\\s+.*probability|not a"):
+        policy(df, {})
+    rep = contract.check(df, m)
+    assert not rep.ok and any("not a" in e and "probability" in e
+                              for e in rep.errors)

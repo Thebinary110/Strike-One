@@ -30,6 +30,21 @@ class ContractError(ValueError):
     """The dataset violates the contract in a way we refuse to run past."""
 
 
+def json_safe(obj):
+    """NaN/inf -> None, recursively. json.dumps writes bare NaN otherwise,
+    which is not JSON: jq and JSON.parse both reject it, breaking the
+    advertised --json piping and the TUI's NDJSON stream."""
+    import math
+
+    if isinstance(obj, dict):
+        return {k: json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [json_safe(v) for v in obj]
+    if isinstance(obj, float) and not math.isfinite(obj):
+        return None
+    return obj
+
+
 @dataclass
 class Mapping:
     """column mapping from the caller's schema onto the contract.
@@ -224,7 +239,8 @@ def check(df: pd.DataFrame, m: Mapping, for_audit: bool = True) -> CheckReport:
         warnings.append(f"{int((df['amount'] < 0).sum())} negative amounts "
                         "(refunds?); they are used as-is")
 
-    ent_null = (df["entity"].str.contains("nan")).mean()
+    ent_null = (df["entity"].str.contains(r"(?:^|_)nan(?:_|$)",
+                                          regex=True)).mean()
     if df["entity"].nunique() < 2:
         errors.append("entity key resolves to a single value; episode "
                       "analysis needs real entities")
@@ -238,6 +254,10 @@ def check(df: pd.DataFrame, m: Mapping, for_audit: bool = True) -> CheckReport:
     if for_audit:
         if "label" not in df.columns:
             errors.append("audit needs a label column: --map label=<column>")
+        elif df["label"].notna().any() and float(df["label"].sum()) == 0:
+            errors.append("the label column has no positive rows: there is "
+                          "no fraud to audit. Check the label mapping and "
+                          "its encoding (1 = confirmed fraud)")
         else:
             vals = set(df["label"].dropna().unique().tolist())
             if not vals <= {0, 1, 0.0, 1.0}:
@@ -288,6 +308,13 @@ def check(df: pd.DataFrame, m: Mapping, for_audit: bool = True) -> CheckReport:
                     f"{STICKINESS_THRESHOLD:g}x: labels look "
                     "entity-independent, so the audit will headline "
                     "ordinary recall, not first-hit recall")
+
+    if "p" in df.columns and df["p"].notna().any():
+        pmin, pmax = float(df["p"].min()), float(df["p"].max())
+        if pmin < -1e-9 or pmax > 1 + 1e-9:
+            errors.append(f"p ranges [{pmin:.3g}, {pmax:.3g}] - not a "
+                          "calibrated probability. policy would price "
+                          "nonsense; calibrate on an earlier slice first")
 
     if "score" in df.columns:
         sn = df["score"].isna().mean()
