@@ -381,3 +381,48 @@ def test_policy_refuses_uncalibrated_p():
     rep = contract.check(df, m)
     assert not rep.ok and any("not a" in e and "probability" in e
                               for e in rep.errors)
+
+
+def test_route_lift_is_undefined_at_zero_over_zero():
+    """0.0% -> 0.0% is 0/0 (undefined), not 'infx'; and x/0 with x>0 has
+    no finite ratio. JSON carries null; the table prints '-' / 'from 0'."""
+    from strikeone.route import RouteResult
+    res = RouteResult(
+        lane1={"rows": 2, "row_share": 0.01, "entities": 1},
+        curve=[
+            {"per_day": 1, "budget": 5, "fs_recall_off": 0.0,
+             "fs_recall_on": 0.0, "lift": None, "primary": False},
+            {"per_day": 5, "budget": 25, "fs_recall_off": 0.0,
+             "fs_recall_on": 0.25, "lift": None, "primary": False},
+            {"per_day": 10, "budget": 50, "fs_recall_off": 0.2,
+             "fs_recall_on": 0.5, "lift": 2.5, "primary": True},
+        ])
+    txt = res.to_text()
+    assert "inf" not in txt
+    lines = txt.splitlines()
+    assert any(l.rstrip().endswith("-") for l in lines)
+    assert any(l.rstrip().endswith("from 0") for l in lines)
+    assert any(l.rstrip().endswith("2.50x") for l in lines)
+    assert "Infinity" not in res.to_json() and "NaN" not in res.to_json()
+    # and the engine itself never emits inf in the curve
+    df, _ = mapped()
+    r = route(df, label_delay_days=7.0)
+    assert all(c["lift"] is None or np.isfinite(c["lift"]) for c in r.curve)
+
+
+def test_top_level_namespace_has_no_import_leaks():
+    """Only __all__ (plus submodules and dunders) may be visible; the
+    importlib.metadata exception class leaked in 1.0.2."""
+    import sys
+    import types
+
+    import strikeone
+
+    assert not hasattr(strikeone, "PackageNotFoundError")
+    for name in dir(strikeone):
+        if name.startswith("_") or name in strikeone.__all__:
+            continue
+        attr = getattr(strikeone, name)
+        assert isinstance(attr, types.ModuleType) and \
+            attr.__name__.startswith("strikeone"), \
+            f"unexpected top-level name leaked: {name}"
