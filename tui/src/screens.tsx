@@ -9,6 +9,7 @@ export type Session = {
   meta?: any; check?: any; audit?: any; route?: any;
   policy?: any; ranges?: any; worstCorner?: any;
   stream?: any; featured?: any[]; caseData?: any;
+  ai?: {title: string; text: string; busy?: boolean};
 };
 
 const Sentence = ({text, width}: {text: string; width: number}) => (
@@ -131,7 +132,7 @@ export const Audit = ({s, capIdx, width}: {s: Session; capIdx: number;
             </Text>
             {a.budgets.map((r: any, i: number) => (
               <Text key={r.per_day} inverse={i === capIdx}>
-                {`  ${String(r.per_day).padStart(9)}   ${pct(r.headline_recall).padStart(7)}   ${pct(r.fs_recall).padStart(12)}   ${pct(r.redundancy_rate).padStart(14)}   ${fmt(r.false_positives).padStart(14)}`}
+                {`  ${String(r.per_day).padStart(9)}   ${pct(r.headline_recall).padStart(7)}   ${pct(r.fs_recall).padStart(12)}   ${pct(r.blocklist_coverable_rate).padStart(14)}   ${fmt(r.false_positives).padStart(14)}`}
                 {r.primary ? <Text color={C.accent}>  {'<-'} matched to your
  fraud volume</Text> : null}
               </Text>
@@ -406,3 +407,31 @@ export const Case = ({s, reveal, width}: {s: Session; reveal: number;
 const NeedData = () => (
   <Text color={C.dim}>no dataset loaded; press 1 and pick a source</Text>
 );
+
+
+// ------------------------------------------------------------------ AI
+export const Ai = ({s, width}: {s: Session; width: number}) => {
+  const a = s.ai;
+  if (!a)
+    return (
+      <Box flexDirection="column" gap={1}>
+        <Text bold>ASK ABOUT A DECISION</Text>
+        <Text color={C.dim}>{`press / then type:
+  why <transaction id>       why this decision, with validated citations
+  timeline <case id>         one case, quiet period to covered run
+  compare <transaction id>   blocklist lane vs scorer, and why they diverged
+  evidence why <txn>         the raw evidence contract (no model needed)
+  provider                   where narration requests would go`}</Text>
+        <Text color={C.dim} wrap="wrap">The model only narrates decisions the
+ engine already made; every number and decision word it outputs is re-checked
+ against the evidence contract before it reaches this screen.</Text>
+      </Box>
+    );
+  return (
+    <Box flexDirection="column" gap={1} width={Math.min(width - 2, 100)}>
+      <Text bold inverse>{` ${a.title} `}</Text>
+      {a.busy ? <Text color={C.waste}>{a.text}</Text>
+              : <Text wrap="wrap">{a.text}</Text>}
+    </Box>
+  );
+};

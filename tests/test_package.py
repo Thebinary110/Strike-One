@@ -491,3 +491,31 @@ def test_find_node_falls_back_to_pip_managed_runtime(monkeypatch, tmp_path):
 
     monkeypatch.setattr(builtins, "__import__", no_nodejs)
     assert cli._find_node() is None
+
+
+def test_rpc_slash_command_backends(tmp_path, monkeypatch):
+    """The TUI's / commands land on these rpc methods: AI disabled by
+    default, evidence needs no model, capacity re-audits, provider chain
+    reports the disabled state."""
+    from strikeone.rpc import Session
+
+    monkeypatch.chdir(tmp_path)          # no .strikeone-ai.toml here
+    s = Session()
+    s.init({"example": "synthetic"})
+    # ai: disabled default is a message, not an error
+    r = s.ai({"cmd": "why", "target": "11254"})
+    assert r.get("disabled") and "strikeone ai setup" in r["text"]
+    with pytest.raises(ValueError):
+        s.ai({"cmd": "challenge", "target": "1"})
+    # evidence: deterministic, no provider needed
+    ev = s.evidence({"cmd": "why", "target": "11254"})
+    assert '"contract_version": "1.0"' in ev["text"]
+    with pytest.raises(ValueError):
+        s.evidence({"cmd": "simulate", "target": "1"})
+    # provider chain: disabled text
+    assert "disabled" in s.provider_chain({})["text"]
+    # audit honours a capacity change and re-computes
+    a50 = s.audit({"capacity": 50})
+    assert [b["per_day"] for b in a50["budgets"] if b["primary"]] == [50]
+    a100 = s.audit({"capacity": 100})
+    assert [b["per_day"] for b in a100["budgets"] if b["primary"]] == [100]
