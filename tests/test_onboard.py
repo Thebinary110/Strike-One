@@ -224,3 +224,127 @@ def test_onboard_non_interactive_refuses_without_human(tmp_path,
                "--map", "label=fraud_flag", "--delay", "7"],
         interactive=False)
     assert code2 == 0, out2.err
+
+
+# ------------------- black-box acceptance findings (v1.1.1) -------------------
+
+def test_score_leak_check_is_wired_into_decisions():
+    """Finding 1: a label-derived score must escalate to ask with the leak
+    warning attached (and recorded), not auto-accept at 94%."""
+    df = messy_frame()
+    rng = np.random.default_rng(2)
+    # exactly-equal score: binary -> hard-rejected before any leak logic
+    df_eq = df.assign(equal_score=df["fraud_flag"] * 1.0)
+    assert ob.validate_field("score", df_eq, "equal_score")["hard"]
+    # strongly label-derived, continuous: passes hard checks, must escalate
+    df_leak = df.assign(final_risk_score=np.clip(
+        df["fraud_flag"] * 0.85 + 0.05 + rng.normal(0, 0.01, len(df)),
+        0, 1))
+    props = [ob.Proposal("final_risk_score", "score", 0.94, "score-ish"),
+             ob.Proposal("fraud_flag", "label", 0.94, "label")]
+    d = ob.decide(df_leak, props)["score"]
+    assert d.status == "ask", "leaky score auto-accepted"
+    assert any("label-derived" in w for w in d.validation["soft"])
+    # unrelated score: no leak warning, auto-accept still allowed
+    d2 = ob.decide(df, [ob.Proposal("model_score", "score", 0.94, "score"),
+                        ob.Proposal("fraud_flag", "label", 0.94, "label")])
+    assert d2["score"].status == "auto"
+    assert not any("label-derived" in w
+                   for w in d2["score"].validation.get("soft", []))
+
+
+def test_typed_override_shows_warnings_and_requires_consent(
+        tmp_path, monkeypatch, capsys):
+    """Finding 2: a typed override with soft warnings must display them and
+    get explicit consent before acceptance."""
+    from strikeone import cli, contract
+    df = messy_frame()
+    src = tmp_path / "t.csv"; df.to_csv(src, index=False)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    # override entity with the transaction-unique column, then consent
+    answers = iter(["txn_ref", "y", "fraud_flag", "7"])
+    prompts = []
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda *a: (prompts.append(a[0] if a else ""), next(answers))[1])
+    with pytest.raises(SystemExit) as ex:
+        cli.main(["onboard", str(src)])
+    out = capsys.readouterr().out
+    assert ex.value.code == 0
+    assert "too fine for episodes" in out, "uniqueness warning not shown"
+    assert any("proceed with" in q for q in prompts), \
+        "no consent prompt before accepting the risky override"
+    m = contract.Mapping.load(tmp_path / ".strikeone.toml")
+    assert m.columns["entity"] == ["txn_ref"]
+    rec = json.loads((tmp_path / ".strikeone.onboarding.json").read_text())
+    assert any("too fine" in w for w in
+               rec["decisions"]["entity"]["validation"]["soft"])
+
+
+def test_typed_override_declined_writes_nothing(tmp_path, monkeypatch,
+                                                capsys):
+    from strikeone import cli
+    df = messy_frame()
+    src = tmp_path / "t.csv"; df.to_csv(src, index=False)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    answers = iter(["txn_ref", "n"])              # decline at the warning
+    monkeypatch.setattr("builtins.input", lambda *a: next(answers))
+    with pytest.raises(SystemExit) as ex:
+        cli.main(["onboard", str(src)])
+    assert ex.value.code == 2
+    assert not (tmp_path / ".strikeone.toml").exists()
+    assert not (tmp_path / ".strikeone.onboarding.json").exists()
+
+
+def test_typed_implausible_label_shows_prevalence_warning(
+        tmp_path, monkeypatch, capsys):
+    from strikeone import cli
+    rng = np.random.default_rng(3)
+    df = messy_frame().assign(
+        flagged_by_ops=(rng.random(400) < 0.45).astype(int))
+    src = tmp_path / "t.csv"; df.to_csv(src, index=False)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    answers = iter(["customer_ref", "flagged_by_ops", "y", "7"])
+    monkeypatch.setattr("builtins.input", lambda *a: next(answers))
+    with pytest.raises(SystemExit) as ex:
+        cli.main(["onboard", str(src)])
+    out = capsys.readouterr().out
+    assert ex.value.code == 0
+    assert "prevalence" in out and "outside the usual" in out, \
+        "prevalence warning not shown for a typed label override"
+
+
+def test_hard_invalid_typed_mapping_still_rejects(tmp_path, monkeypatch,
+                                                  capsys):
+    from strikeone import cli
+    df = messy_frame()
+    src = tmp_path / "t.csv"; df.to_csv(src, index=False)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    answers = iter(["internal_notes"])            # garbage as timestamp
+    monkeypatch.setattr("builtins.input", lambda *a: next(answers))
+    with pytest.raises(SystemExit) as ex:
+        cli.main(["onboard", str(src), "--map",
+                  "transaction_id=txn_ref"])
+    assert ex.value.code == 2
+    assert "REJECTED by validation" in capsys.readouterr().err
+    assert not (tmp_path / ".strikeone.toml").exists()
+
+
+def test_version_flag(capsys):
+    """Finding 3: strikeone --version exits 0 with the canonical version."""
+    import importlib.metadata
+
+    import strikeone
+    from strikeone import cli
+    with pytest.raises(SystemExit) as ex:
+        cli.main(["--version"])
+    assert ex.value.code == 0
+    out = capsys.readouterr().out
+    ver = importlib.metadata.version("strikeone")
+    assert ver in out and "strikeone" in out
+    assert "usage:" not in out and "error" not in out
+    assert strikeone.__version__ == ver
