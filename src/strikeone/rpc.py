@@ -177,6 +177,167 @@ class Session:
                                str(p.get("target", "")))
         return {"text": _json.dumps(con, indent=2)}
 
+    # -------------------------------------------------- onboarding wizard
+    # The TUI's /onboard flow. Same machinery and gates as the CLI: the
+    # scan never auto-accepts label/entity/competing timestamps; every
+    # human answer is validated on the real data before acceptance; the
+    # file is written only by onboard_finish after all gates pass.
+
+    def onboard_scan(self, p):
+        from strikeone import onboard as ob
+        source = p["source"]
+        raw = contract.read_source(source)
+        share = bool(p.get("share_samples"))
+        profiles = ob.profile_frame(raw, share_samples=share)
+        proposals = ob.heuristic_proposals(profiles)
+        model, dropped, ai_note = \
+            "heuristic only (no AI provider configured)", [], None
+        from strikeone.ai import aiconfig
+        cfg = aiconfig.AIConfig.load()
+        if cfg is not None:
+            from strikeone.ai.providers import ProviderError
+            try:
+                ai_props, dropped, model = ob.llm_proposals(profiles,
+                                                            cfg.build())
+                proposals += ai_props
+            except ProviderError as e:
+                ai_note = f"AI proposer unavailable ({e}); heuristic only"
+        decisions = ob.decide(raw, proposals)
+        self._ob = {"raw": raw, "profiles": profiles, "share": share,
+                    "decisions": decisions, "source": source,
+                    "model": model, "dropped": dropped}
+        from pathlib import Path as _P
+        rows = []
+        for t, d in decisions.items():
+            rows.append({"target": t, "source": d.source,
+                         "status": d.status,
+                         "confidence": d.confidence, "method": d.method,
+                         "reason": d.reason, "competing": d.competing,
+                         "soft": d.validation.get("soft", []),
+                         "required": t in ob.REQUIRED})
+        pending = [r["target"] for r in rows
+                   if r["status"] == "ask"
+                   or (r["required"] and r["status"] == "unmapped")]
+        return {"rows": rows, "pending": pending, "model": model,
+                "ai_note": ai_note, "share_samples": share,
+                "toml_exists": _P(contract.CONFIG_FILE).exists()}
+
+    def _ob_state(self):
+        ob_state = getattr(self, "_ob", None)
+        if ob_state is None:
+            raise RuntimeError("no onboarding in progress; run "
+                               "/onboard <file> first")
+        return ob_state
+
+    def onboard_validate(self, p):
+        from strikeone import onboard as ob
+        st = self._ob_state()
+        target = p["target"]
+        src = p["source"]
+        if target == "entity" and not isinstance(src, list):
+            src = [c.strip() for c in
+                   str(src).replace("+", ",").split(",") if c.strip()]
+        val = ob.validate_field(target, st["raw"], src)
+        if target == "score" and not val["hard"]:
+            lb = st["decisions"].get("label")
+            if lb is not None and lb.source is not None:
+                leak = ob.score_leak_check(
+                    st["raw"],
+                    src if not isinstance(src, list) else src[0],
+                    lb.source if not isinstance(lb.source, list)
+                    else lb.source[0])
+                if leak and leak not in val["soft"]:
+                    val["soft"].append(leak)
+        return {"source": src, "hard": val["hard"], "soft": val["soft"]}
+
+    def onboard_accept(self, p):
+        from strikeone import onboard as ob
+        st = self._ob_state()
+        target = p["target"]
+        d = st["decisions"][target]
+        v = self.onboard_validate(p)
+        if v["hard"]:
+            raise RuntimeError("; ".join(v["hard"]))
+        proposed = d.source if isinstance(d.source, list) else [d.source]
+        answered = v["source"] if isinstance(v["source"], list) \
+            else [v["source"]]
+        d.source = v["source"]
+        d.status = "confirmed"
+        d.method = d.method if answered == proposed else "user"
+        d.validation = {"hard": [], "soft": v["soft"]}
+        return {"ok": True, "soft": v["soft"]}
+
+    def onboard_skip(self, p):
+        from strikeone import onboard as ob
+        st = self._ob_state()
+        target = p["target"]
+        if target in ob.REQUIRED:
+            raise RuntimeError(f"{target} is required and cannot be "
+                               "skipped")
+        st["decisions"][target] = ob.Decision(target_field=target)
+        return {"ok": True}
+
+    def onboard_finish(self, p):
+        import json as _json
+        from pathlib import Path as _P
+
+        from strikeone import onboard as ob
+        st = self._ob_state()
+        decisions = st["decisions"]
+        missing = [t for t in ob.REQUIRED
+                   if decisions[t].status not in ("auto", "confirmed")]
+        if missing:
+            raise RuntimeError("still unanswered: " + ", ".join(missing))
+        delay = float(p.get("delay", 7.0))
+        cfg_path = _P(contract.CONFIG_FILE)
+        if cfg_path.exists() and not p.get("overwrite"):
+            return {"needs_overwrite": str(cfg_path)}
+        m = ob.decisions_to_mapping(decisions, delay, st["source"])
+        rep = ob.final_gate(st["raw"], m)
+        if not rep.ok:
+            raise RuntimeError("final contract check refused the mapping: "
+                               + "; ".join(rep.errors))
+        rec = ob.audit_record(decisions, st["profiles"], delay,
+                              st["model"], st["dropped"], st["share"])
+        m.save(cfg_path)
+        _P(".strikeone.onboarding.json").write_text(
+            _json.dumps(rec, indent=2))
+        n_auto = sum(1 for d in decisions.values() if d.status == "auto")
+        n_conf = sum(1 for d in decisions.values()
+                     if d.status == "confirmed")
+        self._ob = None
+        return {"written": [str(cfg_path), ".strikeone.onboarding.json"],
+                "auto": n_auto, "confirmed": n_conf,
+                "source": st["source"]}
+
+    def onboard_abort(self, _p):
+        self._ob = None
+        return {"ok": True}
+
+    def ai_setup(self, p):
+        """Provider config from the TUI. Never a secret: api_key_env must
+        LOOK like an env var name, and guarded_write refuses any value
+        matching a *KEY*/*TOKEN* environment variable's value."""
+        import re as _re
+
+        from strikeone.ai import aiconfig
+        key_env = p.get("api_key_env") or "OPENAI_API_KEY"
+        if not _re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", key_env):
+            raise RuntimeError(
+                f"{key_env!r} does not look like an environment variable "
+                "NAME (UPPER_SNAKE_CASE). Never enter the key itself - "
+                "export it in your shell and give its name here.")
+        cfg = aiconfig.AIConfig(provider=p["provider"],
+                                model=p.get("model", ""),
+                                base_url=p.get("base_url", ""),
+                                api_key_env=key_env,
+                                think=p.get("think", ""))
+        provider = cfg.build()   # validates provider/base_url combination
+        cfg.save()
+        return {"text": "written to .strikeone-ai.toml (no secrets: it "
+                        "stores the env var's name, not its value)\n\n"
+                        + provider.chain_text()}
+
     def provider_chain(self, _p):
         from strikeone.ai import aiconfig
         cfg = aiconfig.AIConfig.load()
@@ -282,6 +443,13 @@ def main():
                "featured": sess.featured, "case": sess.case,
                "ai": sess.ai, "evidence": sess.evidence,
                "provider_chain": sess.provider_chain,
+               "onboard_scan": sess.onboard_scan,
+               "onboard_validate": sess.onboard_validate,
+               "onboard_accept": sess.onboard_accept,
+               "onboard_skip": sess.onboard_skip,
+               "onboard_finish": sess.onboard_finish,
+               "onboard_abort": sess.onboard_abort,
+               "ai_setup": sess.ai_setup,
                "ping": lambda _p: {"pong": True}}
     for line in sys.stdin:
         line = line.strip()

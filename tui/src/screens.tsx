@@ -435,3 +435,77 @@ export const Ai = ({s, width}: {s: Session; width: number}) => {
     </Box>
   );
 };
+
+
+// ------------------------------------------------------------ ONBOARD
+export type Wiz = {
+  source: string; rows: any[]; queue: string[]; idx: number;
+  phase: 'ask' | 'consent' | 'delay' | 'overwrite';
+  buf: string; tomlExists?: boolean; aiNote?: string | null;
+  pendingSrc?: any; warnings?: string[]; delay?: string; msg?: string;
+  labelSet: boolean;
+};
+
+export const Wizard = ({w, width}: {w: Wiz; width: number}) => {
+  const autos = w.rows.filter((r: any) => r.status === 'auto');
+  const t = w.queue[w.idx];
+  const row = w.rows.find((r: any) => r.target === t);
+  return (
+    <Box flexDirection="column" gap={1} width={Math.min(width - 2, 100)}>
+      <Text bold inverse>{` ONBOARD ${w.source} `}</Text>
+      {w.aiNote ? <Text color={C.waste}>{w.aiNote}</Text> : null}
+      {autos.length ? (
+        <Box flexDirection="column">
+          {autos.map((r: any) => (
+            <Text key={r.target} color={C.dim}>
+              {`  ${String(r.source).padEnd(22)} -> ${r.target.padEnd(15)} `}
+              {`${Math.round(r.confidence * 100)}%  auto-accepted`}
+            </Text>
+          ))}
+        </Box>
+      ) : null}
+      {w.phase === 'ask' && t ? (
+        <Box flexDirection="column">
+          <Text bold>{`? ${t}`}
+            {row?.source
+              ? <Text color={C.dim}>{`  proposed '${row.source}' (${Math.round((row.confidence ?? 0) * 100)}%, ${row.method})`}</Text>
+              : <Text color={C.dim}>  no candidate found</Text>}
+          </Text>
+          {row?.reason ? <Text color={C.dim}>{`    ${row.reason}`}</Text> : null}
+          {row?.competing?.length ? (
+            <Text color={C.dim}>{'    also considered: '
+              + row.competing.map((c: any) => `${c[0]} (${Math.round(c[1] * 100)}%)`).join(', ')}</Text>
+          ) : null}
+          {t === 'label' ? (
+            <Text color={C.waste} wrap="wrap">    label is always confirmed
+ by a human: a wrong label corrupts every downstream number, and no
+ statistical check can verify its meaning</Text>
+          ) : null}
+          <Text>
+            {'    column'}{t === 'entity' ? '(s, a+b for several)' : ''}
+            {` [${row?.source ?? 'skip'}]: `}
+            <Text bold>{w.buf}</Text><Text inverse> </Text>
+          </Text>
+        </Box>
+      ) : null}
+      {w.phase === 'consent' ? (
+        <Box flexDirection="column">
+          {(w.warnings ?? []).map(warn => (
+            <Text key={warn} color={C.waste}>{`    warning: ${warn}`}</Text>
+          ))}
+          <Text bold>{`    proceed with ${JSON.stringify(w.pendingSrc)} anyway? [y/N] `}</Text>
+        </Box>
+      ) : null}
+      {w.phase === 'delay' ? (
+        <Text bold>{'How many days until a fraud label becomes known? [7]: '}
+          <Text>{w.buf}</Text><Text inverse> </Text>
+        </Text>
+      ) : null}
+      {w.phase === 'overwrite' ? (
+        <Text bold color={C.waste}>{'.strikeone.toml exists - overwrite? [y/N] '}</Text>
+      ) : null}
+      {w.msg ? <Text color={C.harm}>{`    ${w.msg}`}</Text> : null}
+      <Text color={C.dim}>esc abort (nothing written until every gate passes)</Text>
+    </Box>
+  );
+};

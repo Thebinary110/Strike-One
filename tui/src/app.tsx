@@ -2,7 +2,7 @@ import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {Box, Text, useApp, useInput, useStdout} from 'ink';
 import {Rpc} from './rpc.js';
 import {C, Rule} from './ui.js';
-import {Ai, Audit, Case, Connect, Econ, Route, Session, Stream} from './screens.js';
+import {Ai, Audit, Case, Connect, Econ, Route, Session, Stream, Wizard, Wiz} from './screens.js';
 
 const TABS = ['CONNECT', 'AUDIT', 'ROUTE', 'ECONOMICS', 'STREAM', 'CASE', 'AI'];
 const CENTRAL = {m: 0.15, a: 0.125, e: 0.775, c_h: 30.0};
@@ -28,6 +28,7 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
   const [pathBuf, setPathBuf] = useState<string | null>(null);
   const [cmdBuf, setCmdBuf] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [wiz, setWiz] = useState<Wiz | null>(null);
   const rpc = useMemo(() => new Rpc(), []);
   const econTimer = useRef<any>(null);
 
@@ -148,6 +149,107 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
     setSess(s => ({...s, audit}));
   }
 
+  // ------------------- in-TUI onboarding wizard (same gates as the CLI:
+  // label/entity/competing timestamps are always human questions; every
+  // answer is validated on the real data; nothing written until finish)
+  async function startOnboard(path: string) {
+    setTab(6);
+    setSess(s => ({...s, ai: {title: `onboard ${path}`,
+                              text: 'scanning dataset...', busy: true}}));
+    try {
+      const scan = await rpc.call('onboard_scan', {source: path});
+      setSess(s => ({...s, ai: undefined}));
+      if (!scan.pending.length) {
+        setWiz({source: path, rows: scan.rows, queue: [], idx: 0,
+                phase: 'delay', buf: '', tomlExists: scan.toml_exists,
+                aiNote: scan.ai_note, labelSet: false});
+        return;
+      }
+      setWiz({source: path, rows: scan.rows, queue: scan.pending, idx: 0,
+              phase: 'ask', buf: '', tomlExists: scan.toml_exists,
+              aiNote: scan.ai_note, labelSet: false});
+    } catch (e: any) {
+      setSess(s => ({...s, ai: {title: `onboard ${path}`,
+                                text: `error: ${String(e?.message ?? e)}`}}));
+    }
+  }
+
+  async function wizAdvance(w: Wiz, labelSet: boolean) {
+    if (w.idx + 1 < w.queue.length) {
+      setWiz({...w, idx: w.idx + 1, phase: 'ask', buf: '', msg: undefined,
+              labelSet});
+    } else if (labelSet) {
+      setWiz({...w, phase: 'delay', buf: '', msg: undefined, labelSet});
+    } else {
+      await wizFinish({...w, labelSet}, '7');
+    }
+  }
+
+  async function wizSubmit(w: Wiz, text: string) {
+    const t = w.queue[w.idx];
+    const row = w.rows.find((r: any) => r.target === t);
+    const src = text.trim() || row?.source;
+    try {
+      if (!src || src === 'skip') {
+        if (row?.required) { setWiz({...w, buf: '', msg: `${t} is required; type a column name (esc aborts)`}); return; }
+        await rpc.call('onboard_skip', {target: t});
+        await wizAdvance(w, w.labelSet);
+        return;
+      }
+      const v = await rpc.call('onboard_validate', {target: t, source: src});
+      if (v.hard?.length) {
+        setWiz({...w, buf: '', msg: `REJECTED: ${v.hard.join('; ')}`});
+        return;
+      }
+      if (v.soft?.length) {
+        setWiz({...w, phase: 'consent', pendingSrc: v.source,
+                warnings: v.soft, buf: ''});
+        return;
+      }
+      await rpc.call('onboard_accept', {target: t, source: v.source});
+      await wizAdvance(w, w.labelSet || t === 'label');
+    } catch (e: any) {
+      setWiz({...w, buf: '', msg: String(e?.message ?? e)});
+    }
+  }
+
+  async function wizConsent(w: Wiz, yes: boolean) {
+    const t = w.queue[w.idx];
+    if (!yes) { setWiz({...w, phase: 'ask', buf: '', pendingSrc: undefined,
+                        warnings: undefined,
+                        msg: 'declined; pick another column'}); return; }
+    try {
+      await rpc.call('onboard_accept', {target: t, source: w.pendingSrc});
+      await wizAdvance({...w, pendingSrc: undefined, warnings: undefined},
+                       w.labelSet || t === 'label');
+    } catch (e: any) {
+      setWiz({...w, phase: 'ask', buf: '', msg: String(e?.message ?? e)});
+    }
+  }
+
+  async function wizFinish(w: Wiz, delayText: string, overwrite = false) {
+    const delay = Number(delayText.trim() || '7');
+    if (!Number.isFinite(delay) || delay < 0) {
+      setWiz({...w, buf: '', msg: 'delay must be a number of days'});
+      return;
+    }
+    try {
+      const r = await rpc.call('onboard_finish', {delay, overwrite});
+      if (r.needs_overwrite) {
+        setWiz({...w, phase: 'overwrite', delay: String(delay), buf: ''});
+        return;
+      }
+      setWiz(null);
+      setSess(s => ({...s, ai: {title: `onboard ${w.source}`,
+        text: `${r.auto} mapping(s) auto-accepted, ${r.confirmed} human-confirmed` +
+          String.fromCharCode(10) + `written: ${r.written.join(', ')}` +
+          String.fromCharCode(10) + String.fromCharCode(10) +
+          `load it now: /source ${w.source}`}}));
+    } catch (e: any) {
+      setWiz({...w, msg: String(e?.message ?? e)});
+    }
+  }
+
   // deterministic slash-command router: the input line maps 1:1 onto rpc
   // methods and tab switches; no model ever chooses what runs.
   async function runCommand(raw: string) {
@@ -221,11 +323,29 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
           show('provider', r.text);
           return;
         }
-        case 'onboard': case 'setup':
-          setTab(6);
-          show(c, 'This one runs in your shell - its confirmation prompts are deliberate:\n  ' +
-            (c === 'onboard' ? 'strikeone onboard <file>' : 'strikeone ai setup --provider ollama --model <name>'));
+        case 'onboard': {
+          if (!arg[0]) { setTab(6); show('onboard', 'usage: /onboard <file.csv|parquet>'); return; }
+          void startOnboard(arg[0]);
           return;
+        }
+        case 'setup': {
+          setTab(6);
+          const usage = 'usage:\n  /setup ollama <model> [think:off]\n  /setup openai <base_url> <model> <API_KEY_ENV_NAME>\nnever type a key itself - export it in your shell and give its NAME';
+          if (!arg[0]) { show('setup', usage); return; }
+          const kind = arg[0].toLowerCase();
+          let params: any = null;
+          if (kind === 'ollama' && arg[1])
+            params = {provider: 'ollama', model: arg[1],
+                      think: (arg[2] ?? '').replace('think:', '')};
+          else if ((kind === 'openai' || kind === 'openai-compatible') && arg[1] && arg[2])
+            params = {provider: 'openai-compatible', base_url: arg[1],
+                      model: arg[2], api_key_env: arg[3]};
+          if (!params) { show('setup', usage); return; }
+          show('setup', 'writing provider config...', true);
+          const r = await rpc.call('ai_setup', params);
+          show('setup', r.text);
+          return;
+        }
         default:
           setTab(6);
           show(raw, `unknown command: /${c}\n\ncommands: audit [n] . capacity n . route . policy k=v . stream . case [id]\nwhy <txn> . timeline <case> . compare <txn> . evidence <cmd> <id> . provider\nsource <path> . example <name> . onboard . setup . help . quit`);
@@ -247,6 +367,42 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
   }
 
   useInput((input, key) => {
+    if (wiz) {
+      if (key.escape) {
+        void rpc.call('onboard_abort');
+        setWiz(null);
+        setNote('onboarding aborted; nothing was written');
+        return;
+      }
+      if (wiz.phase === 'consent') {
+        const ch = (input ?? '').toLowerCase();
+        if (ch === 'y') void wizConsent(wiz, true);
+        else if (ch === 'n') void wizConsent(wiz, false);
+        return;
+      }
+      if (wiz.phase === 'overwrite') {
+        const ch = (input ?? '').toLowerCase();
+        if (ch === 'y') void wizFinish(wiz, wiz.delay ?? '7', true);
+        else if (ch === 'n') {
+          setWiz(null);
+          setNote('kept the existing .strikeone.toml; nothing written');
+        }
+        return;
+      }
+      // text phases: ask, delay - same CR-coalescing handling as the bar
+      const clean = (input ?? '').replace(/[^\x20-\x7e]/g, '');
+      if (key.return || /[\r\n]/.test(input ?? '')) {
+        const before = (input ?? '').split(/[\r\n]/)[0]
+          .replace(/[^\x20-\x7e]/g, '');
+        const answer = wiz.buf + before;
+        if (wiz.phase === 'delay') void wizFinish({...wiz, buf: ''}, answer);
+        else void wizSubmit({...wiz, buf: ''}, answer);
+      }
+      else if (key.backspace || key.delete)
+        setWiz({...wiz, buf: wiz.buf.slice(0, -1)});
+      else if (clean) setWiz({...wiz, buf: wiz.buf + clean});
+      return;
+    }
     if (cmdBuf !== null) {
       const clean = (input ?? '').replace(/[^\x20-\x7e]/g, '');
       if (key.return || /[\r\n]/.test(input ?? '')) {
@@ -348,6 +504,7 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
           tab === 4 ? <Stream s={sess} shownRows={shownRows} paused={paused}
                               width={width} /> :
           tab === 5 ? <Case s={sess} reveal={reveal} width={width} /> :
+          wiz       ? <Wizard w={wiz} width={width} /> :
                       <Ai s={sess} width={width} />
         )}
       </Box>

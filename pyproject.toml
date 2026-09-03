@@ -1,6 +1,6 @@
 [project]
 name = "strikeone"
-version = "1.3.0"
+version = "1.4.0"
 description = "Bring-your-own-scorer fraud evaluation: cases caught at the first labelled transaction vs your headline metric, blocklist routing, cost-derived actions, and a citation-validated AI narration layer. Offline; your data never leaves the machine."
 readme = "README.md"
 license = { file = "LICENSE" }
