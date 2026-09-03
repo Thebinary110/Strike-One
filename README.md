@@ -8,7 +8,7 @@ episode-aware evaluation that selected it. Swap in your own scorer.**
 [![PyPI](https://img.shields.io/pypi/v/strikeone)](https://pypi.org/project/strikeone/)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB)
 ![License](https://img.shields.io/badge/license-Apache--2.0-green)
-![Tests](https://img.shields.io/badge/tests-92%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-93%20passing-brightgreen)
 ![Offline](https://img.shields.io/badge/network%20calls-zero-black)
 
 </div>
@@ -66,8 +66,8 @@ pip install -e .          # or: uv sync
 ```
 
 Extras: `pip install "strikeone[db]"` for database-URL sources,
-`"strikeone[research]"` to reproduce the study. The TUI additionally
-needs the repo and Node 18+: `cd tui && npm install && npx tsc`.
+`"strikeone[tui]"` for a pip-managed Node runtime if you don't have
+Node 18+, `"strikeone[research]"` to reproduce the study.
 
 ## Try it in 30 seconds
 
@@ -238,9 +238,14 @@ PSP-shaped disputes export: [`examples/`](https://github.com/Thebinary110/Strike
 
 ## The terminal UI
 
+Ships bundled in the wheel - `pip install strikeone` is enough (plus a
+Node 18+ runtime: your own, or `pip install "strikeone[tui]"` to have
+pip manage one):
+
 ```bash
+strikeone tui --example synthetic
 strikeone tui --help          # usage + all keys
-strikeone tui --example ieee-cis
+strikeone tui --source yourdata.parquet   # uses .strikeone.toml beside it
 ```
 
 <img src="https://raw.githubusercontent.com/Thebinary110/Strike-One/main/reports/stage6/tui_audit.png" width="820" alt="Strike One TUI, audit panel">

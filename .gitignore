@@ -12,3 +12,6 @@ models/
 
 # local AI-layer config (provider choice; never contains secrets)
 .strikeone-ai.toml
+
+# bundled TUI (built by `npm run bundle` in tui/; shipped in the wheel)
+src/strikeone/_tui/

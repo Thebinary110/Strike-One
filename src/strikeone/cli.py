@@ -167,16 +167,55 @@ def cmd_policy(args) -> int:
     return 0
 
 
+def _bundled_tui() -> Path | None:
+    """The single-file TUI bundle shipped inside release wheels."""
+    p = Path(__file__).parent / "_tui" / "cli.mjs"
+    return p if p.exists() else None
+
+
+def _find_node() -> str | None:
+    """System node, else the pip-managed runtime from strikeone[tui]
+    (nodejs-wheel-binaries ships its binary inside site-packages, not on
+    PATH, so which() alone cannot find it)."""
+    node = shutil.which("node")
+    if node:
+        return node
+    try:
+        import nodejs_wheel
+        p = Path(nodejs_wheel.__file__).parent / "bin" / "node"
+        if p.exists():
+            return str(p)
+    except ImportError:
+        pass
+    return None
+
+
 def cmd_tui(args) -> int:
+    node = _find_node()
+    bundle = _bundled_tui()
+    if bundle is not None:
+        if not node:
+            print("the TUI needs a Node 18+ runtime. Either install Node, "
+                  "or let pip manage one:\n"
+                  "  pip install \"strikeone[tui]\"\n"
+                  "(the Python core works fully without it)",
+                  file=sys.stderr)
+            return 2
+        # STRIKEONE_ROOT = the caller's directory, so --source paths and
+        # .strikeone.toml resolve where the user is standing
+        env = dict(os.environ, STRIKEONE_PY=sys.executable,
+                   STRIKEONE_ROOT=os.getcwd())
+        return subprocess.call([node, str(bundle), *args.rest], env=env)
     tui_dir = config.REPO_ROOT / "tui"
     if not tui_dir.exists():
-        print("the TUI lives in the repo, not the PyPI package (the Python "
-              "core you have is fully functional without it):\n"
+        print("this build has no bundled TUI (the Python core you have is "
+              "fully functional without it). Official PyPI releases ship "
+              "it bundled - pip install --upgrade strikeone - or run it "
+              "from the repo:\n"
               "  git clone https://github.com/Thebinary110/Strike-One\n"
               "  cd Strike-One/tui && npm install && npx tsc",
               file=sys.stderr)
         return 2
-    node = shutil.which("node")
     if not node:
         print("the TUI needs Node 18+ (the Python core does not). "
               "Install Node, then: cd tui && npm install", file=sys.stderr)

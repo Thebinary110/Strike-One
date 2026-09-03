@@ -426,3 +426,68 @@ def test_top_level_namespace_has_no_import_leaks():
         assert isinstance(attr, types.ModuleType) and \
             attr.__name__.startswith("strikeone"), \
             f"unexpected top-level name leaked: {name}"
+
+
+def test_tui_launch_routing(monkeypatch, capsys):
+    """Bundled-first TUI launch: node missing -> [tui]-extra hint; no
+    bundle and no repo -> upgrade/clone pointer. No process is spawned."""
+    from pathlib import Path as P
+
+    from strikeone import cli
+
+    # bundle present, node missing: point at the pip-managed runtime
+    monkeypatch.setattr(cli, "_bundled_tui", lambda: P("/fake/cli.mjs"))
+    monkeypatch.setattr(cli, "_find_node", lambda: None)
+
+    class A: rest = []
+    assert cli.cmd_tui(A) == 2
+    assert 'strikeone[tui]' in capsys.readouterr().err
+    # no bundle, no repo: upgrade or clone
+    monkeypatch.setattr(cli, "_bundled_tui", lambda: None)
+    monkeypatch.setattr(cli, "_find_node", lambda: None)
+    monkeypatch.setattr(cli.config, "REPO_ROOT", P("/nonexistent"))
+    assert cli.cmd_tui(A) == 2
+    err = capsys.readouterr().err
+    assert "no bundled TUI" in err and "git clone" in err
+    # bundle present AND node present: it spawns exactly [node, bundle]
+    monkeypatch.setattr(cli, "_bundled_tui", lambda: P("/fake/cli.mjs"))
+    monkeypatch.setattr(cli, "_find_node", lambda: "/usr/bin/node")
+    calls = {}
+
+    def fake_call(cmd, env=None):
+        calls["cmd"], calls["env"] = cmd, env
+        return 0
+
+    monkeypatch.setattr(cli.subprocess, "call", fake_call)
+    assert cli.cmd_tui(A) == 0
+    assert calls["cmd"] == ["/usr/bin/node", "/fake/cli.mjs"]
+    assert calls["env"]["STRIKEONE_ROOT"] == cli.os.getcwd()
+
+
+def test_find_node_falls_back_to_pip_managed_runtime(monkeypatch, tmp_path):
+    """strikeone[tui] installs nodejs-wheel-binaries, whose node binary
+    lives inside site-packages (NOT on PATH); _find_node must find it."""
+    import sys
+    import types
+
+    from strikeone import cli
+
+    monkeypatch.setattr(cli.shutil, "which", lambda *_: None)
+    fake = types.ModuleType("nodejs_wheel")
+    (tmp_path / "bin").mkdir()
+    node = tmp_path / "bin" / "node"
+    node.write_text("#!/bin/sh\n")
+    fake.__file__ = str(tmp_path / "__init__.py")
+    monkeypatch.setitem(sys.modules, "nodejs_wheel", fake)
+    assert cli._find_node() == str(node)
+    del sys.modules["nodejs_wheel"]
+    import builtins
+    real_import = builtins.__import__
+
+    def no_nodejs(name, *a, **k):
+        if name == "nodejs_wheel":
+            raise ImportError(name)
+        return real_import(name, *a, **k)
+
+    monkeypatch.setattr(builtins, "__import__", no_nodejs)
+    assert cli._find_node() is None
