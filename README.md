@@ -250,8 +250,22 @@ strikeone tui --source yourdata.parquet   # uses .strikeone.toml beside it
 
 <img src="https://raw.githubusercontent.com/Thebinary110/Strike-One/main/reports/stage6/tui_audit.png" width="820" alt="Strike One TUI, audit panel">
 
-Six panels (CONNECT, AUDIT, ROUTE, ECONOMICS, STREAM, CASE), fully
-keyboard-driven, runs offline over stdio to the local Python core.
+Seven panels (CONNECT, AUDIT, ROUTE, ECONOMICS, STREAM, CASE, AI), fully
+keyboard-driven, offline over stdio to the local Python core - and a
+command line inside the session: press `/` and type, Claude-Code style:
+
+```
+/audit 50            re-run the audit at your real review capacity
+/why 11254           explain one decision (AI, citations validated)
+/timeline c1097      narrate one fraud case
+/compare 21349       blocklist lane vs scorer on one transaction
+/evidence why 11254  the raw evidence contract - no model needed
+/policy e=0.8 s=0.5  reprice the decision policy
+/case <entity>       jump to any case  ·  /provider  ·  /source <path>
+```
+
+The model never chooses what runs: the command line maps 1:1 onto the
+same deterministic engine calls the CLI uses.
 
 ## The AI layer (optional, off by default)
 

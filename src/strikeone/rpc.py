@@ -119,15 +119,72 @@ class Session:
         return {"ok": rep.ok, "errors": rep.errors,
                 "warnings": rep.warnings, "stats": rep.stats}
 
-    def audit(self, _p):
+    def audit(self, p):
         self._need()
+        cap = p.get("capacity")
+        if cap is not None:
+            cap = float(cap)
+        if getattr(self, "_audit_cap", "unset") != cap:
+            self.audit_res = None
         if self.audit_res is None:
             self.audit_res = run_audit(
-                self.df, label_delay_days=self.mapping.label_delay_days)
+                self.df, label_delay_days=self.mapping.label_delay_days,
+                capacity_per_day=cap)
+            self._audit_cap = cap
         r = self.audit_res
         return {"stats": r.stats, "blocklist": r.blocklist,
                 "headline": r.headline, "budgets": r.budgets,
                 "sentence": r.sentence}
+
+    # ----------------------------------------------------- slash commands
+    # The TUI's `/why /timeline /compare /evidence /provider` inputs land
+    # here. Same rules as the CLI: AI narrates finished evidence, disabled
+    # by default, provider failures come back as text, never tracebacks.
+
+    def ai(self, p):
+        self._need()
+        from strikeone.ai import aiconfig, commands
+        from strikeone.ai.providers import ProviderError
+        cmd = p.get("cmd")
+        if cmd not in ("why", "timeline", "compare"):
+            raise ValueError(f"unknown ai command {cmd!r}")
+        cfg = aiconfig.AIConfig.load()
+        if cfg is None:
+            return {"disabled": True, "text":
+                    "AI is disabled (the default). Configure it once in "
+                    "your shell:\n  strikeone ai setup --provider ollama "
+                    "--model <name>\nThen /why /timeline /compare work "
+                    "here. /evidence <cmd> <id> needs no model at all."}
+        try:
+            res = commands.run(cmd, self.df, self.mapping,
+                               str(p.get("target", "")), cfg.build())
+        except ProviderError as e:
+            return {"error_text": f"AI provider unavailable\n{e}\n"
+                    "Core panels remain fully available."}
+        return {"text": res["rendered"], "model": res["model"],
+                "validity": res["validity"],
+                "hash": res["evidence_hash"]}
+
+    def evidence(self, p):
+        self._need()
+        import json as _json
+
+        from strikeone.ai import evidence as ev
+        cmd = p.get("cmd")
+        if cmd not in ev.BUILDERS:
+            raise ValueError(f"unknown evidence command {cmd!r}")
+        con = ev.BUILDERS[cmd](self.df, self.mapping,
+                               str(p.get("target", "")))
+        return {"text": _json.dumps(con, indent=2)}
+
+    def provider_chain(self, _p):
+        from strikeone.ai import aiconfig
+        cfg = aiconfig.AIConfig.load()
+        if cfg is None:
+            return {"text": "AI: disabled (the default). No provider "
+                    "configured; every panel runs exactly as always.\n"
+                    "Enable in your shell: strikeone ai setup"}
+        return {"text": cfg.build().chain_text()}
 
     def route_curve(self, _p):
         self._need()
@@ -223,6 +280,8 @@ def main():
                "audit": sess.audit, "route_curve": sess.route_curve,
                "policy": sess.policy, "stream": sess.stream,
                "featured": sess.featured, "case": sess.case,
+               "ai": sess.ai, "evidence": sess.evidence,
+               "provider_chain": sess.provider_chain,
                "ping": lambda _p: {"pong": True}}
     for line in sys.stdin:
         line = line.strip()

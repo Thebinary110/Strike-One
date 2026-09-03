@@ -2,9 +2,9 @@ import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {Box, Text, useApp, useInput, useStdout} from 'ink';
 import {Rpc} from './rpc.js';
 import {C, Rule} from './ui.js';
-import {Audit, Case, Connect, Econ, Route, Session, Stream} from './screens.js';
+import {Ai, Audit, Case, Connect, Econ, Route, Session, Stream} from './screens.js';
 
-const TABS = ['CONNECT', 'AUDIT', 'ROUTE', 'ECONOMICS', 'STREAM', 'CASE'];
+const TABS = ['CONNECT', 'AUDIT', 'ROUTE', 'ECONOMICS', 'STREAM', 'CASE', 'AI'];
 const CENTRAL = {m: 0.15, a: 0.125, e: 0.775, c_h: 30.0};
 
 export const App = ({initialExample, initialSource, frameTab, motion}: {
@@ -26,6 +26,8 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
   const [caseIdx, setCaseIdx] = useState(0);
   const [reveal, setReveal] = useState(0);
   const [pathBuf, setPathBuf] = useState<string | null>(null);
+  const [cmdBuf, setCmdBuf] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const rpc = useMemo(() => new Rpc(), []);
   const econTimer = useRef<any>(null);
 
@@ -138,6 +140,103 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
     });
   }
 
+  async function recap(n: number) {
+    if (!Number.isFinite(n) || n <= 0) throw new Error('capacity must be a positive number');
+    const audit = await rpc.call('audit', {capacity: n});
+    const pi = audit.budgets?.findIndex((b: any) => b.primary) ?? 0;
+    setCapIdx(Math.max(pi, 0));
+    setSess(s => ({...s, audit}));
+  }
+
+  // deterministic slash-command router: the input line maps 1:1 onto rpc
+  // methods and tab switches; no model ever chooses what runs.
+  async function runCommand(raw: string) {
+    const parts = raw.trim().replace(/^\//, '').split(/\s+/).filter(Boolean);
+    if (!parts.length) return;
+    const c = parts[0].toLowerCase();
+    const arg = parts.slice(1);
+    const show = (title: string, text: string, busy = false) =>
+      setSess(s => ({...s, ai: {title, text, busy}}));
+    try {
+      switch (c) {
+        case 'help': setHelp(true); return;
+        case 'quit': case 'exit': exit(); return;
+        case 'example': load({example: arg[0] ?? 'synthetic'}); return;
+        case 'source': case 'open':
+          if (arg[0]) load({source: arg[0]});
+          else setNote('usage: /source <path>');
+          return;
+        case 'connect': case 'check': setTab(0); return;
+        case 'audit':
+          setTab(1);
+          if (arg[0] !== undefined) await recap(Number(arg[0]));
+          return;
+        case 'capacity':
+          if (arg[0] === undefined) { setNote('usage: /capacity <reviews per day>'); return; }
+          await recap(Number(arg[0])); setTab(1);
+          return;
+        case 'route': setTab(2); return;
+        case 'policy': {
+          setTab(3);
+          if (arg.length) {
+            const np: any = {...params};
+            for (const kv of arg) {
+              const [k, v] = kv.split('=');
+              if (k && v !== undefined && Number.isFinite(Number(v))) np[k] = Number(v);
+            }
+            setParams(np);
+            const pol = await rpc.call('policy', {...np, grid: false});
+            setSess(s => ({...s, policy: pol}));
+          }
+          return;
+        }
+        case 'stream': setTab(4); return;
+        case 'case':
+          setTab(5);
+          if (arg.length) {
+            const cd = await rpc.call('case', {entity: arg.join(' ')});
+            setReveal(motion ? 0 : cd.rows.length);
+            setSess(s => ({...s, caseData: cd}));
+          }
+          return;
+        case 'why': case 'timeline': case 'compare': {
+          setTab(6);
+          if (!arg[0]) { show(c, `usage: /${c} <${c === 'timeline' ? 'case id' : 'transaction id'}>`); return; }
+          show(`${c} ${arg[0]}`, 'narrating - every claim will be validated against the evidence contract...', true);
+          const r = await rpc.call('ai', {cmd: c, target: arg[0]});
+          show(`${c} ${arg[0]}`, r.text ?? r.error_text ?? '(no output)');
+          return;
+        }
+        case 'evidence': {
+          setTab(6);
+          if (!arg[0] || !arg[1]) { show('evidence', 'usage: /evidence <why|timeline|compare> <id>  (deterministic, no model)'); return; }
+          show(`evidence ${arg[0]} ${arg[1]}`, 'computing...', true);
+          const r = await rpc.call('evidence', {cmd: arg[0], target: arg[1]});
+          show(`evidence ${arg[0]} ${arg[1]}`, r.text);
+          return;
+        }
+        case 'provider': {
+          setTab(6);
+          const r = await rpc.call('provider_chain');
+          show('provider', r.text);
+          return;
+        }
+        case 'onboard': case 'setup':
+          setTab(6);
+          show(c, 'This one runs in your shell - its confirmation prompts are deliberate:\n  ' +
+            (c === 'onboard' ? 'strikeone onboard <file>' : 'strikeone ai setup --provider ollama --model <name>'));
+          return;
+        default:
+          setTab(6);
+          show(raw, `unknown command: /${c}\n\ncommands: audit [n] . capacity n . route . policy k=v . stream . case [id]\nwhy <txn> . timeline <case> . compare <txn> . evidence <cmd> <id> . provider\nsource <path> . example <name> . onboard . setup . help . quit`);
+          return;
+      }
+    } catch (e: any) {
+      setTab(6);
+      show(raw, `error: ${String(e?.message ?? e)}`);
+    }
+  }
+
   async function nextCase() {
     if (!sess.featured?.length) return;
     const i = (caseIdx + 1) % sess.featured.length;
@@ -148,19 +247,39 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
   }
 
   useInput((input, key) => {
+    if (cmdBuf !== null) {
+      const clean = (input ?? '').replace(/[^\x20-\x7e]/g, '');
+      if (key.return || /[\r\n]/.test(input ?? '')) {
+        const before = (input ?? '').split(/[\r\n]/)[0]
+          .replace(/[^\x20-\x7e]/g, '');
+        const c = cmdBuf + before;
+        setCmdBuf(null); setNote(null); void runCommand(c);
+      }
+      else if (key.escape) setCmdBuf(null);
+      else if (key.backspace || key.delete) setCmdBuf(cmdBuf.slice(0, -1));
+      else if (clean) setCmdBuf(cmdBuf + clean);
+      return;
+    }
+    if (input === '/') { setCmdBuf(''); setHelp(false); return; }
     if (pathBuf !== null) {
-      if (key.return) { const p = pathBuf; setPathBuf(null); load({source: p}); }
+      const clean = (input ?? '').replace(/[^\x20-\x7e]/g, '');
+      if (key.return || /[\r\n]/.test(input ?? '')) {
+        const before = (input ?? '').split(/[\r\n]/)[0]
+          .replace(/[^\x20-\x7e]/g, '');
+        const p = pathBuf + before;
+        setPathBuf(null); load({source: p});
+      }
       else if (key.escape) setPathBuf(null);
       else if (key.backspace || key.delete)
         setPathBuf(pathBuf.slice(0, -1));
-      else if (input) setPathBuf(pathBuf + input);
+      else if (clean) setPathBuf(pathBuf + clean);
       return;
     }
     if (input === 'q') { exit(); return; }
     if (input === '?') { setHelp(h => !h); return; }
-    if (key.tab && key.shift) { setTab(t => (t + 5) % 6); return; }
-    if (key.tab) { setTab(t => (t + 1) % 6); return; }
-    if (/[1-6]/.test(input)) { setTab(Number(input) - 1); return; }
+    if (key.tab && key.shift) { setTab(t => (t + 6) % 7); return; }
+    if (key.tab) { setTab(t => (t + 1) % 7); return; }
+    if (/[1-7]/.test(input)) { setTab(Number(input) - 1); return; }
     const nb = sess.audit?.budgets?.length ?? 0;
     if (tab === 0) {
       if (input === 'i') load({example: 'ieee-cis'});
@@ -202,7 +321,7 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
           <Text bold> STRIKE ONE</Text>
           <Text color={C.dim}>  the corrected fraud evaluation</Text>
         </Text>
-        <Text color={C.dim}>? help  q quit</Text>
+        <Text color={C.dim}>/ commands  ? help  q quit</Text>
       </Box>
       <Rule width={width - 2} heavy />
       <Box gap={narrow ? 1 : 3}>
@@ -228,14 +347,26 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
                             width={width} /> :
           tab === 4 ? <Stream s={sess} shownRows={shownRows} paused={paused}
                               width={width} /> :
-                      <Case s={sess} reveal={reveal} width={width} />
+          tab === 5 ? <Case s={sess} reveal={reveal} width={width} /> :
+                      <Ai s={sess} width={width} />
         )}
       </Box>
       <Rule width={width - 2} />
-      <Text color={C.dim} wrap="truncate">
+      {cmdBuf !== null ? (
+        <Text>
+          <Text bold color={C.accent}>/</Text>
+          <Text>{cmdBuf}</Text>
+          <Text inverse> </Text>
+          <Text color={C.dim}>   enter run . esc cancel</Text>
+        </Text>
+      ) : note ? (
+        <Text color={C.waste}>{note}</Text>
+      ) : (
+        <Text color={C.dim} wrap="truncate">
         we ship the method and the measurement; you bring the scorer. The
  IEEE-CIS run is a worked example, not a deployable model.
-      </Text>
+        </Text>
+      )}
     </Box>
   );
 };
@@ -243,8 +374,11 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
 const Help = () => (
   <Box flexDirection="column" gap={1}>
     <Text bold>Keys</Text>
-    <Text color={C.dim}>{`  tab / shift-tab   next / previous panel
-  1..6              jump to a panel
+    <Text color={C.dim}>{`  /                 command line: /audit 50 . /why <txn> . /timeline <case>
+                    /compare <txn> . /evidence why <txn> . /policy e=0.8 s=0.5
+                    /capacity 50 . /case <entity> . /provider . /source <path>
+  tab / shift-tab   next / previous panel
+  1..7              jump to a panel
   h l  (or arrows)  change budget (AUDIT, ROUTE) or adjust a value (ECONOMICS)
   j k               select an economics input
   space             pause the decision stream
