@@ -268,7 +268,9 @@ command line inside the session: press `/` and type, Claude-Code style:
 ```
 
 The model never chooses what runs: the command line maps 1:1 onto the
-same deterministic engine calls the CLI uses.
+same deterministic engine calls the CLI uses. The input line is a real
+editor - block cursor, arrow keys, ctrl-a/e/u/w, click to move the
+cursor, up/down for history, paste-safe.
 
 ## The AI layer (optional, off by default)
 

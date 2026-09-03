@@ -1,6 +1,6 @@
 import React from 'react';
 import {Box, Text} from 'ink';
-import {Banner, Bar, Big, C, Rule, Stat, braillePlot, fmt, pct} from './ui.js';
+import {Banner, Bar, Big, C, Ed, EditorText, Rule, Stat, braillePlot, fmt, pct} from './ui.js';
 
 export type Session = {
   status: 'none' | 'loading' | 'error' | 'ready';
@@ -20,8 +20,8 @@ const Sentence = ({text, width}: {text: string; width: number}) => (
 );
 
 // ------------------------------------------------------------- CONNECT
-export const Connect = ({s, width, pathBuf}: {s: Session; width: number;
-                         pathBuf: string | null}) => (
+export const Connect = ({s, width, pathEd}: {s: Session; width: number;
+                         pathEd: Ed | null}) => (
   <Box flexDirection="column" gap={1}>
     <Banner width={width} />
     <Text bold>Point strikeone at labelled transactions. Nothing leaves this
@@ -35,8 +35,8 @@ export const Connect = ({s, width, pathBuf}: {s: Session; width: number;
  parquet/CSV (uses the mapping in .strikeone.toml; set it up once with
  `strikeone check --map ... --save-config`)</Text>
     </Box>
-    {pathBuf !== null && (
-      <Text>path: <Text bold>{pathBuf}</Text><Text color={C.dim}> (enter to
+    {pathEd !== null && (
+      <Text>path: <EditorText ed={pathEd} /><Text color={C.dim}> (enter to
  load, esc to cancel)</Text></Text>
     )}
     {s.status === 'loading' && <Text color={C.dim}>loading {s.label} ...</Text>}
@@ -441,7 +441,7 @@ export const Ai = ({s, width}: {s: Session; width: number}) => {
 export type Wiz = {
   source: string; rows: any[]; queue: string[]; idx: number;
   phase: 'ask' | 'consent' | 'delay' | 'overwrite';
-  buf: string; tomlExists?: boolean; aiNote?: string | null;
+  ed: Ed; tomlExists?: boolean; aiNote?: string | null;
   pendingSrc?: any; warnings?: string[]; delay?: string; msg?: string;
   labelSet: boolean;
 };
@@ -484,7 +484,7 @@ export const Wizard = ({w, width}: {w: Wiz; width: number}) => {
           <Text>
             {'    column'}{t === 'entity' ? '(s, a+b for several)' : ''}
             {` [${row?.source ?? 'skip'}]: `}
-            <Text bold>{w.buf}</Text><Text inverse> </Text>
+            <EditorText ed={w.ed} />
           </Text>
         </Box>
       ) : null}
@@ -498,7 +498,7 @@ export const Wizard = ({w, width}: {w: Wiz; width: number}) => {
       ) : null}
       {w.phase === 'delay' ? (
         <Text bold>{'How many days until a fraud label becomes known? [7]: '}
-          <Text>{w.buf}</Text><Text inverse> </Text>
+          <EditorText ed={w.ed} />
         </Text>
       ) : null}
       {w.phase === 'overwrite' ? (

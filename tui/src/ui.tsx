@@ -158,3 +158,85 @@ export const Bar = ({parts, width}: {
     ))}
   </Text>
 );
+
+
+// ------------------------------------------------------- line editor
+// A real input line: cursor-indexed editing, chunk-safe (fast typing or
+// paste can deliver '9\x7f' or 'text\r' as ONE stdin chunk), block
+// cursor rendering, and mouse-click positioning handled by the app.
+export type Ed = {text: string; cur: number};
+export const edNew = (text = ''): Ed => ({text, cur: text.length});
+
+const MOUSE_RE = /(?:\x1b)?\[?<\d+;\d+;\d+[mM]/g; // leaked SGR reports
+
+function wordLeft(t: string, c: number) {
+  let i = c;
+  while (i > 0 && t[i - 1] === ' ') i--;
+  while (i > 0 && t[i - 1] !== ' ') i--;
+  return i;
+}
+function wordRight(t: string, c: number) {
+  let i = c;
+  while (i < t.length && t[i] === ' ') i++;
+  while (i < t.length && t[i] !== ' ') i++;
+  return i;
+}
+
+export function edApply(ed: Ed, rawInput: string | undefined, key: any):
+    {ed: Ed; submit?: string; cancel?: boolean} {
+  // a mouse report round-tripping through the key parser must be a
+  // strict no-op (SAME object), or its stale-state set clobbers the
+  // click handler's cursor move
+  if (rawInput && /^(?:\x1b)?\[?<\d+;\d+;\d+[mM]$/.test(rawInput))
+    return {ed};
+  if (key?.escape) return {ed, cancel: true};
+  let {text, cur} = ed;
+  if (key?.leftArrow) {
+    cur = (key.ctrl || key.meta) ? wordLeft(text, cur) : Math.max(0, cur - 1);
+    return {ed: {text, cur}};
+  }
+  if (key?.rightArrow) {
+    cur = (key.ctrl || key.meta) ? wordRight(text, cur)
+                                 : Math.min(text.length, cur + 1);
+    return {ed: {text, cur}};
+  }
+  const input = (rawInput ?? '').replace(MOUSE_RE, '');
+  if (key?.ctrl) {
+    if (input === 'a') return {ed: {text, cur: 0}};
+    if (input === 'e') return {ed: {text, cur: text.length}};
+    if (input === 'u') return {ed: {text: text.slice(cur), cur: 0}};
+    if (input === 'k') return {ed: {text: text.slice(0, cur), cur}};
+    if (input === 'w') {
+      const w = wordLeft(text, cur);
+      return {ed: {text: text.slice(0, w) + text.slice(cur), cur: w}};
+    }
+  }
+  if (key?.return && !input) return {ed, submit: text};
+  if ((key?.backspace || key?.delete) && !input) {
+    if (cur > 0) { text = text.slice(0, cur - 1) + text.slice(cur); cur--; }
+    return {ed: {text, cur}};
+  }
+  for (const ch of input) {
+    if (ch === '\r' || ch === '\n') return {ed: {text, cur}, submit: text};
+    if (ch === '\x7f' || ch === '\b') {
+      if (cur > 0) { text = text.slice(0, cur - 1) + text.slice(cur); cur--; }
+      continue;
+    }
+    if ((ch.codePointAt(0) ?? 0) < 32) continue;
+    text = text.slice(0, cur) + ch + text.slice(cur);
+    cur++;
+  }
+  return {ed: {text, cur}};
+}
+
+export const EditorText = ({ed}: {ed: Ed}) => {
+  const {text, cur} = ed;
+  const at = cur < text.length ? text[cur] : ' ';
+  return (
+    <Text>
+      <Text>{text.slice(0, cur)}</Text>
+      <Text inverse>{at}</Text>
+      <Text>{cur < text.length ? text.slice(cur + 1) : ''}</Text>
+    </Text>
+  );
+};
