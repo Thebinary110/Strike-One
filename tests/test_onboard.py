@@ -348,3 +348,69 @@ def test_version_flag(capsys):
     assert ver in out and "strikeone" in out
     assert "usage:" not in out and "error" not in out
     assert strikeone.__version__ == ver
+
+
+# ------------------- the in-TUI wizard backend (rpc) -------------------
+
+def test_rpc_onboarding_wizard_flow(tmp_path, monkeypatch):
+    """The /onboard wizard's rpc backend keeps every CLI gate: label and
+    entity are pending (never auto), answers are validated on the real
+    data (lists pass through unmangled), nothing is written before
+    finish, and an existing toml needs explicit overwrite consent."""
+    from strikeone.rpc import Session
+
+    monkeypatch.chdir(tmp_path)
+    messy_frame().to_csv("t.csv", index=False)
+    s = Session()
+    scan = s.onboard_scan({"source": "t.csv"})
+    assert "label" in scan["pending"] and "entity" in scan["pending"]
+    label_row = next(r for r in scan["rows"] if r["target"] == "label")
+    assert label_row["status"] == "ask"          # never auto, ever
+    # finish before answering the required entity -> refused, no files
+    with pytest.raises(RuntimeError, match="unanswered"):
+        s.onboard_finish({"delay": 7})
+    assert not (tmp_path / ".strikeone.toml").exists()
+    # a risky answer surfaces its warning; a LIST source is not mangled
+    v = s.onboard_validate({"target": "entity", "source": ["txn_ref"]})
+    assert v["source"] == ["txn_ref"]
+    assert any("too fine" in w for w in v["soft"])
+    # required fields cannot be skipped
+    with pytest.raises(RuntimeError, match="required"):
+        s.onboard_skip({"target": "entity"})
+    s.onboard_accept({"target": "entity", "source": "customer_ref"})
+    s.onboard_accept({"target": "label", "source": "fraud_flag"})
+    r = s.onboard_finish({"delay": 7})
+    assert set(r["written"]) == {".strikeone.toml",
+                                 ".strikeone.onboarding.json"}
+    # second run against the existing toml: consent required
+    s2 = Session()
+    s2.onboard_scan({"source": "t.csv"})
+    s2.onboard_accept({"target": "entity", "source": "customer_ref"})
+    s2.onboard_accept({"target": "label", "source": "fraud_flag"})
+    import hashlib
+    h0 = hashlib.sha256((tmp_path / ".strikeone.toml").read_bytes()).digest()
+    assert s2.onboard_finish({"delay": 7})["needs_overwrite"]
+    assert hashlib.sha256(
+        (tmp_path / ".strikeone.toml").read_bytes()).digest() == h0
+    assert s2.onboard_finish({"delay": 14, "overwrite": True})["written"]
+    # abort clears staged state
+    s2.onboard_abort({})
+    with pytest.raises(RuntimeError, match="no onboarding"):
+        s2.onboard_accept({"target": "label", "source": "fraud_flag"})
+
+
+def test_rpc_ai_setup_never_accepts_a_secret_looking_name(tmp_path,
+                                                          monkeypatch):
+    from strikeone.rpc import Session
+
+    monkeypatch.chdir(tmp_path)
+    s = Session()
+    with pytest.raises(RuntimeError, match="env"):
+        s.ai_setup({"provider": "openai-compatible",
+                    "base_url": "https://x.test/v1", "model": "m",
+                    "api_key_env": "sk-or-v1-notaname"})
+    out = s.ai_setup({"provider": "ollama", "model": "somemodel",
+                      "think": "off"})
+    assert "no secrets" in out["text"]
+    cfg = (tmp_path / ".strikeone-ai.toml").read_text()
+    assert "somemodel" in cfg and "sk-" not in cfg

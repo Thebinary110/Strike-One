@@ -262,6 +262,9 @@ command line inside the session: press `/` and type, Claude-Code style:
 /evidence why 11254  the raw evidence contract - no model needed
 /policy e=0.8 s=0.5  reprice the decision policy
 /case <entity>       jump to any case  ·  /provider  ·  /source <path>
+/onboard <file>      the full mapping wizard, in-session (label always
+                     human-confirmed; esc aborts with nothing written)
+/setup ollama <model>            configure the AI provider from inside
 ```
 
 The model never chooses what runs: the command line maps 1:1 onto the
