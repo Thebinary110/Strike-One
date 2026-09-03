@@ -173,8 +173,25 @@ def _bundled_tui() -> Path | None:
     return p if p.exists() else None
 
 
-def cmd_tui(args) -> int:
+def _find_node() -> str | None:
+    """System node, else the pip-managed runtime from strikeone[tui]
+    (nodejs-wheel-binaries ships its binary inside site-packages, not on
+    PATH, so which() alone cannot find it)."""
     node = shutil.which("node")
+    if node:
+        return node
+    try:
+        import nodejs_wheel
+        p = Path(nodejs_wheel.__file__).parent / "bin" / "node"
+        if p.exists():
+            return str(p)
+    except ImportError:
+        pass
+    return None
+
+
+def cmd_tui(args) -> int:
+    node = _find_node()
     bundle = _bundled_tui()
     if bundle is not None:
         if not node:
