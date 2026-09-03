@@ -479,7 +479,28 @@ def decide(df: pd.DataFrame, proposals: list,
         else:
             d.status = "ask"
         decisions[target] = d
+    apply_score_leak_check(df, decisions)
     return decisions
+
+
+def apply_score_leak_check(df: pd.DataFrame, decisions: dict) -> None:
+    """Cross-field validation: a candidate score that near-perfectly
+    separates the candidate label is probably label-derived (leaky). The
+    warning escalates the score to human confirmation - it does not hard
+    reject, because a genuinely superb model is indistinguishable from a
+    leak by statistics alone; the human decides with the warning shown.
+    (Black-box finding 1: this check existed but was never invoked.)"""
+    sc = decisions.get("score")
+    lb = decisions.get("label")
+    if not sc or not lb or sc.source is None or lb.source is None:
+        return
+    warn = score_leak_check(df, sc.source,
+                            lb.source if not isinstance(lb.source, list)
+                            else lb.source[0])
+    if warn and warn not in sc.validation.setdefault("soft", []):
+        sc.validation["soft"].append(warn)
+        if sc.status == "auto":
+            sc.status = "ask"
 
 
 # ------------------------------------------------------------- assembly

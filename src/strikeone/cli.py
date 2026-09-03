@@ -276,12 +276,36 @@ def cmd_onboard(args) -> int:
                 return 2
             decisions[t] = ob.Decision(target_field=t)
             continue
+        _as_list = lambda v: v if isinstance(v, list) else [v]  # noqa: E731
+        typed_override = _as_list(src) != _as_list(d.source)
         val = ob.validate_field(t, raw, src)
         if val["hard"]:
             print("    REJECTED by validation: " + "; ".join(val["hard"]),
                   file=sys.stderr)
             return 2
-        d.source, d.status, d.method = src, "confirmed",             d.method if src == d.source else "user"
+        if t == "score":
+            lb = decisions.get("label")
+            if lb is not None and lb.source is not None:
+                leak = ob.score_leak_check(
+                    raw, src if not isinstance(src, list) else src[0],
+                    lb.source if not isinstance(lb.source, list)
+                    else lb.source[0])
+                if leak and leak not in val["soft"]:
+                    val["soft"].append(leak)
+        # a typed override gets the SAME safety information the sidecar
+        # records, BEFORE final acceptance (black-box finding 2: warnings
+        # were computed and filed but never shown for typed answers)
+        if val["soft"] and typed_override:
+            for w in val["soft"]:
+                print(f"    warning: {w}")
+            sname = "+".join(src) if isinstance(src, list) else src
+            if input(f"    proceed with {sname!r} anyway? [y/N]: "
+                     ).strip().lower() != "y":
+                print("    declined; aborting without writing anything.",
+                      file=sys.stderr)
+                return 2
+        d.source, d.status, d.method = (
+            src, "confirmed", d.method if not typed_override else "user")
         d.validation = val
 
     missing = [t for t in ob.REQUIRED
@@ -430,12 +454,15 @@ def main(argv=None) -> None:
             rest = argv[1:]
         sys.exit(cmd_tui(_A))
 
+    from strikeone import __version__
     ap = argparse.ArgumentParser(
         prog="strikeone",
         description="Bring-your-own-scorer fraud routing and the corrected "
                     "(first-hit) evaluation. Your data never leaves the "
                     "machine.",
     )
+    ap.add_argument("--version", action="version",
+                    version=f"strikeone {__version__}")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     for name, fn, doc in [
