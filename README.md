@@ -8,7 +8,7 @@ episode-aware evaluation that selected it. Swap in your own scorer.**
 [![PyPI](https://img.shields.io/pypi/v/strikeone)](https://pypi.org/project/strikeone/)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB)
 ![License](https://img.shields.io/badge/license-Apache--2.0-green)
-![Tests](https://img.shields.io/badge/tests-76%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-86%20passing-brightgreen)
 ![Offline](https://img.shields.io/badge/network%20calls-zero-black)
 
 </div>
@@ -19,6 +19,10 @@ re-catching them — alerts a standing blocklist would also have covered.
 Strike One measures that gap on **your** data, with **your** model, and
 ships the reference detector the corrected evaluation selected.
 
+- `strikeone onboard` - point it at an unfamiliar export and it proposes
+  the column mapping (heuristics + your configured model, if any),
+  validates every candidate against the data, and asks only where
+  ambiguity matters - **the fraud label is always confirmed by a human**
 - `strikeone audit` - your headline metric vs fraud cases caught at their
   **first labelled transaction**, blocklist-coverable alerts, and what a
   blocklist gets you free
@@ -189,7 +193,24 @@ every figure: [`reports/stage7/canonical_comparisons.md`](https://github.com/The
 
 ## Use it on your data - no code
 
-Map your columns once, then every command works:
+Let onboarding propose the mapping - proposals are validated
+deterministically against your data, auto-accepted only when unambiguous,
+and the label, the entity key, and any competing timestamp are always
+confirmed by you (a decision audit lands in `.strikeone.onboarding.json`):
+
+```bash
+strikeone onboard yourdata.parquet     # writes .strikeone.toml
+strikeone audit  yourdata.parquet
+```
+
+With an AI provider configured, a **redacted** schema profile (column
+names, dtypes, statistics, value shapes - never raw values unless you
+pass `--share-samples`) goes to your model as a second proposer; the
+exact egress path is printed before anything is sent. Without one, a
+name/statistics heuristic proposes alone. Either way the model only ever
+*proposes*: acceptance is deterministic validation plus you.
+
+Or map columns by hand once, then every command works:
 
 ```bash
 strikeone check  yourdata.parquet \
