@@ -1,7 +1,7 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {Box, Text, useApp, useInput, useStdout} from 'ink';
 import {Rpc} from './rpc.js';
-import {C, Rule} from './ui.js';
+import {C, Ed, edApply, edNew, EditorText, Rule} from './ui.js';
 import {Ai, Audit, Case, Connect, Econ, Route, Session, Stream, Wizard, Wiz} from './screens.js';
 
 const TABS = ['CONNECT', 'AUDIT', 'ROUTE', 'ECONOMICS', 'STREAM', 'CASE', 'AI'];
@@ -25,9 +25,11 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
   const [streamPos, setStreamPos] = useState(0);
   const [caseIdx, setCaseIdx] = useState(0);
   const [reveal, setReveal] = useState(0);
-  const [pathBuf, setPathBuf] = useState<string | null>(null);
-  const [cmdBuf, setCmdBuf] = useState<string | null>(null);
+  const [pathEd, setPathEd] = useState<Ed | null>(null);
+  const [cmdEd, setCmdEd] = useState<Ed | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const hist = useRef<string[]>([]);
+  const histIdx = useRef(-1);
   const [wiz, setWiz] = useState<Wiz | null>(null);
   const rpc = useMemo(() => new Rpc(), []);
   const econTimer = useRef<any>(null);
@@ -37,6 +39,30 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
       setSize({w: stdout.columns ?? 120, h: stdout.rows ?? 34});
     stdout.on('resize', onResize);
     return () => { stdout.off('resize', onResize); rpc.kill(); };
+  }, []);
+
+  // mouse-click cursor positioning in the command bar: xterm SGR mouse
+  // reporting while the bar is open; a raw stdin listener (Ink cannot
+  // parse mouse reports) maps the click column onto the cursor index.
+  const CMD_TEXT_X = 6;   // app pad + bar border + bar pad + '/ ' prompt
+  useEffect(() => {
+    if (process.stdin.isTTY !== true) return;
+    if (cmdEd !== null) stdout.write('\x1b[?1000h\x1b[?1006h');
+    else stdout.write('\x1b[?1000l\x1b[?1006l');
+    return () => { stdout.write('\x1b[?1000l\x1b[?1006l'); };
+  }, [cmdEd !== null]);
+  useEffect(() => {
+    if (process.stdin.isTTY !== true) return;
+    const onData = (d: Buffer) => {
+      const m = /\x1b\[<0;(\d+);\d+M/.exec(d.toString('latin1'));
+      if (!m) return;
+      const x = Number(m[1]);
+      setCmdEd(ed => ed === null ? ed
+        : {...ed, cur: Math.max(0, Math.min(ed.text.length,
+                                            x - CMD_TEXT_X))});
+    };
+    process.stdin.on('data', onData);
+    return () => { process.stdin.off('data', onData); };
   }, []);
 
   async function load(kind: {example?: string; source?: string}) {
@@ -161,12 +187,12 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
       setSess(s => ({...s, ai: undefined}));
       if (!scan.pending.length) {
         setWiz({source: path, rows: scan.rows, queue: [], idx: 0,
-                phase: 'delay', buf: '', tomlExists: scan.toml_exists,
+                phase: 'delay', ed: edNew(), tomlExists: scan.toml_exists,
                 aiNote: scan.ai_note, labelSet: false});
         return;
       }
       setWiz({source: path, rows: scan.rows, queue: scan.pending, idx: 0,
-              phase: 'ask', buf: '', tomlExists: scan.toml_exists,
+              phase: 'ask', ed: edNew(), tomlExists: scan.toml_exists,
               aiNote: scan.ai_note, labelSet: false});
     } catch (e: any) {
       setSess(s => ({...s, ai: {title: `onboard ${path}`,
@@ -176,10 +202,10 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
 
   async function wizAdvance(w: Wiz, labelSet: boolean) {
     if (w.idx + 1 < w.queue.length) {
-      setWiz({...w, idx: w.idx + 1, phase: 'ask', buf: '', msg: undefined,
+      setWiz({...w, idx: w.idx + 1, phase: 'ask', ed: edNew(), msg: undefined,
               labelSet});
     } else if (labelSet) {
-      setWiz({...w, phase: 'delay', buf: '', msg: undefined, labelSet});
+      setWiz({...w, phase: 'delay', ed: edNew(), msg: undefined, labelSet});
     } else {
       await wizFinish({...w, labelSet}, '7');
     }
@@ -191,31 +217,31 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
     const src = text.trim() || row?.source;
     try {
       if (!src || src === 'skip') {
-        if (row?.required) { setWiz({...w, buf: '', msg: `${t} is required; type a column name (esc aborts)`}); return; }
+        if (row?.required) { setWiz({...w, ed: edNew(), msg: `${t} is required; type a column name (esc aborts)`}); return; }
         await rpc.call('onboard_skip', {target: t});
         await wizAdvance(w, w.labelSet);
         return;
       }
       const v = await rpc.call('onboard_validate', {target: t, source: src});
       if (v.hard?.length) {
-        setWiz({...w, buf: '', msg: `REJECTED: ${v.hard.join('; ')}`});
+        setWiz({...w, ed: edNew(), msg: `REJECTED: ${v.hard.join('; ')}`});
         return;
       }
       if (v.soft?.length) {
         setWiz({...w, phase: 'consent', pendingSrc: v.source,
-                warnings: v.soft, buf: ''});
+                warnings: v.soft, ed: edNew()});
         return;
       }
       await rpc.call('onboard_accept', {target: t, source: v.source});
       await wizAdvance(w, w.labelSet || t === 'label');
     } catch (e: any) {
-      setWiz({...w, buf: '', msg: String(e?.message ?? e)});
+      setWiz({...w, ed: edNew(), msg: String(e?.message ?? e)});
     }
   }
 
   async function wizConsent(w: Wiz, yes: boolean) {
     const t = w.queue[w.idx];
-    if (!yes) { setWiz({...w, phase: 'ask', buf: '', pendingSrc: undefined,
+    if (!yes) { setWiz({...w, phase: 'ask', ed: edNew(), pendingSrc: undefined,
                         warnings: undefined,
                         msg: 'declined; pick another column'}); return; }
     try {
@@ -223,20 +249,20 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
       await wizAdvance({...w, pendingSrc: undefined, warnings: undefined},
                        w.labelSet || t === 'label');
     } catch (e: any) {
-      setWiz({...w, phase: 'ask', buf: '', msg: String(e?.message ?? e)});
+      setWiz({...w, phase: 'ask', ed: edNew(), msg: String(e?.message ?? e)});
     }
   }
 
   async function wizFinish(w: Wiz, delayText: string, overwrite = false) {
     const delay = Number(delayText.trim() || '7');
     if (!Number.isFinite(delay) || delay < 0) {
-      setWiz({...w, buf: '', msg: 'delay must be a number of days'});
+      setWiz({...w, ed: edNew(), msg: 'delay must be a number of days'});
       return;
     }
     try {
       const r = await rpc.call('onboard_finish', {delay, overwrite});
       if (r.needs_overwrite) {
-        setWiz({...w, phase: 'overwrite', delay: String(delay), buf: ''});
+        setWiz({...w, phase: 'overwrite', delay: String(delay), ed: edNew()});
         return;
       }
       setWiz(null);
@@ -389,46 +415,54 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
         }
         return;
       }
-      // text phases: ask, delay - same CR-coalescing handling as the bar
-      const clean = (input ?? '').replace(/[^\x20-\x7e]/g, '');
-      if (key.return || /[\r\n]/.test(input ?? '')) {
-        const before = (input ?? '').split(/[\r\n]/)[0]
-          .replace(/[^\x20-\x7e]/g, '');
-        const answer = wiz.buf + before;
-        if (wiz.phase === 'delay') void wizFinish({...wiz, buf: ''}, answer);
-        else void wizSubmit({...wiz, buf: ''}, answer);
+      // text phases: ask, delay - full line editor
+      const r = edApply(wiz.ed, input, key);
+      if (r.submit === undefined && !r.cancel && r.ed === wiz.ed) return;
+      if (r.cancel) {
+        void rpc.call('onboard_abort');
+        setWiz(null);
+        setNote('onboarding aborted; nothing was written');
+        return;
       }
-      else if (key.backspace || key.delete)
-        setWiz({...wiz, buf: wiz.buf.slice(0, -1)});
-      else if (clean) setWiz({...wiz, buf: wiz.buf + clean});
+      if (r.submit !== undefined) {
+        if (wiz.phase === 'delay')
+          void wizFinish({...wiz, ed: edNew()}, r.submit);
+        else void wizSubmit({...wiz, ed: edNew()}, r.submit);
+      } else setWiz({...wiz, ed: r.ed});
       return;
     }
-    if (cmdBuf !== null) {
-      const clean = (input ?? '').replace(/[^\x20-\x7e]/g, '');
-      if (key.return || /[\r\n]/.test(input ?? '')) {
-        const before = (input ?? '').split(/[\r\n]/)[0]
-          .replace(/[^\x20-\x7e]/g, '');
-        const c = cmdBuf + before;
-        setCmdBuf(null); setNote(null); void runCommand(c);
+    if (cmdEd !== null) {
+      if (key.upArrow || key.downArrow) {
+        const h = hist.current;
+        if (h.length) {
+          histIdx.current = key.upArrow
+            ? Math.min(histIdx.current + 1, h.length - 1)
+            : Math.max(histIdx.current - 1, -1);
+          setCmdEd(edNew(histIdx.current < 0
+            ? '' : h[h.length - 1 - histIdx.current]));
+        }
+        return;
       }
-      else if (key.escape) setCmdBuf(null);
-      else if (key.backspace || key.delete) setCmdBuf(cmdBuf.slice(0, -1));
-      else if (clean) setCmdBuf(cmdBuf + clean);
+      const r = edApply(cmdEd, input, key);
+      if (r.submit === undefined && !r.cancel && r.ed === cmdEd) return;
+      if (r.cancel) { setCmdEd(null); return; }
+      if (r.submit !== undefined) {
+        const c = r.submit.trim();
+        if (c) { hist.current.push(c); histIdx.current = -1; }
+        setCmdEd(null); setNote(null);
+        if (c) void runCommand(c);
+        return;
+      }
+      setCmdEd(r.ed);
       return;
     }
-    if (input === '/') { setCmdBuf(''); setHelp(false); return; }
-    if (pathBuf !== null) {
-      const clean = (input ?? '').replace(/[^\x20-\x7e]/g, '');
-      if (key.return || /[\r\n]/.test(input ?? '')) {
-        const before = (input ?? '').split(/[\r\n]/)[0]
-          .replace(/[^\x20-\x7e]/g, '');
-        const p = pathBuf + before;
-        setPathBuf(null); load({source: p});
-      }
-      else if (key.escape) setPathBuf(null);
-      else if (key.backspace || key.delete)
-        setPathBuf(pathBuf.slice(0, -1));
-      else if (clean) setPathBuf(pathBuf + clean);
+    if (input === '/') { setCmdEd(edNew()); setHelp(false); return; }
+    if (pathEd !== null) {
+      const r = edApply(pathEd, input, key);
+      if (r.submit === undefined && !r.cancel && r.ed === pathEd) return;
+      if (r.cancel) { setPathEd(null); return; }
+      if (r.submit !== undefined) { setPathEd(null); load({source: r.submit}); return; }
+      setPathEd(r.ed);
       return;
     }
     if (input === 'q') { exit(); return; }
@@ -440,7 +474,7 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
     if (tab === 0) {
       if (input === 'i') load({example: 'ieee-cis'});
       if (input === 's') load({example: 'synthetic'});
-      if (input === 'p') setPathBuf('');
+      if (input === 'p') setPathEd(edNew());
     } else if (tab === 1 || tab === 2) {
       if ((input === 'l' || key.rightArrow) && nb)
         setCapIdx(i => Math.min(i + 1, nb - 1));
@@ -496,7 +530,7 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
       <Rule width={width - 2} />
       <Box marginTop={1} flexDirection="column" minHeight={20}>
         {help ? <Help /> : (
-          tab === 0 ? <Connect s={sess} width={width} pathBuf={pathBuf} /> :
+          tab === 0 ? <Connect s={sess} width={width} pathEd={pathEd} /> :
           tab === 1 ? <Audit s={sess} capIdx={capIdx} width={width} /> :
           tab === 2 ? <Route s={sess} width={width} /> :
           tab === 3 ? <Econ s={sess} params={params} sel={econSel}
@@ -509,13 +543,13 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
         )}
       </Box>
       <Rule width={width - 2} />
-      {cmdBuf !== null ? (
-        <Text>
-          <Text bold color={C.accent}>/</Text>
-          <Text>{cmdBuf}</Text>
-          <Text inverse> </Text>
-          <Text color={C.dim}>   enter run . esc cancel</Text>
-        </Text>
+      {cmdEd !== null ? (
+        <Box borderStyle="round" borderColor={C.accent} paddingX={1}>
+          <Text bold color={C.accent}>{'/ '}</Text>
+          <EditorText ed={cmdEd} />
+          <Text color={C.dim}>{'  enter run · esc close · '}
+            {'arrows/click move · up history'}</Text>
+        </Box>
       ) : note ? (
         <Text color={C.waste}>{note}</Text>
       ) : (
@@ -531,7 +565,9 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
 const Help = () => (
   <Box flexDirection="column" gap={1}>
     <Text bold>Keys</Text>
-    <Text color={C.dim}>{`  /                 command line: /audit 50 . /why <txn> . /timeline <case>
+    <Text color={C.dim}>{`  /                 command line (full editing: arrows + ctrl-a/e/u/w,
+                    mouse click moves the cursor, up/down = history):
+                    /audit 50 . /why <txn> . /timeline <case>
                     /compare <txn> . /evidence why <txn> . /policy e=0.8 s=0.5
                     /capacity 50 . /case <entity> . /provider . /source <path>
   tab / shift-tab   next / previous panel
