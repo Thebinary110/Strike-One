@@ -505,11 +505,8 @@ export const Wizard = ({w, width}: {w: Wiz; width: number}) => {
  travels with - usually a card, customer, account, or device column
  (type its name; combine several with a+b)</Text>
           ) : null}
-          <Text>
-            {'    column'}{t === 'entity' ? '(s, a+b for several)' : ''}
-            {` [${row?.source ?? 'skip'}]: `}
-            <EditorText ed={w.ed} />
-          </Text>
+          <Text color={C.accent} bold>    \u2193 type your answer in the
+ box below and press enter</Text>
         </Box>
       ) : null}
       {w.phase === 'consent' ? (
@@ -521,9 +518,8 @@ export const Wizard = ({w, width}: {w: Wiz; width: number}) => {
         </Box>
       ) : null}
       {w.phase === 'delay' ? (
-        <Text bold>{'How many days until a fraud label becomes known? [7]: '}
-          <EditorText ed={w.ed} />
-        </Text>
+        <Text color={C.accent} bold>    \u2193 type the number of days in
+ the box below and press enter</Text>
       ) : null}
       {w.phase === 'overwrite' ? (
         <Text bold color={C.waste}>{'.strikeone.toml exists - overwrite? [y/N] '}</Text>
@@ -533,3 +529,16 @@ export const Wizard = ({w, width}: {w: Wiz; width: number}) => {
     </Box>
   );
 };
+
+
+export function wizPrompt(w: Wiz): string {
+  const t = w.queue[w.idx];
+  const row = w.rows.find((r: any) => r.target === t);
+  if (w.phase === 'ask') {
+    return `column${t === 'entity' ? '(s, a+b for several)' : ''} [${row?.source ?? 'skip'}]: `;
+  }
+  if (w.phase === 'delay') return 'How many days until a fraud label becomes known? [7]: ';
+  if (w.phase === 'consent') return `proceed with ${JSON.stringify(w.pendingSrc)} anyway? [y/N] `;
+  if (w.phase === 'overwrite') return '.strikeone.toml exists - overwrite? [y/N] ';
+  return '';
+}
