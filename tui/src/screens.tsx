@@ -338,7 +338,7 @@ export const Stream = ({s, shownRows, paused, width}: {s: Session;
 export const Case = ({s, reveal, width, rows: _rows}: {s: Session; reveal: number; rows?: number;
                       width: number}) => {
   const c = s.caseData;
-  if (!c) return <NeedData />;
+  if (!c || !c.rows?.length) return <NeedData />;
   const rows = c.rows as any[];
   const w = Math.min(width - 10, 150);
   const lo = rows[0].day, hi = rows[rows.length - 1].day + 1e-9;

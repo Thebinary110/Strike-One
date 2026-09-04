@@ -558,6 +558,8 @@ class Session:
         a = self.arrays()
         eid = p["entity"]
         idx = np.flatnonzero(a["ent"] == eid)
+        if len(idx) == 0:
+            raise ValueError(f"case (entity) {eid!r} not found")
         rows = [{"id": str(a["tb"][i]),
                  "day": round(float((a["t"][i] - a["day0"]) / 86400), 2),
                  "amount": round(float(a["amt"][i]), 2),

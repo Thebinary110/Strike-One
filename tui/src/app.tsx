@@ -414,14 +414,20 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
           return;
         }
         case 'stream': setTab(4); return;
-        case 'case':
-          setTab(5);
-          if (arg.length) {
-            const cd = await rpc.call('case', {entity: arg.join(' ')});
+        case 'case': {
+          if (!arg.length) { setTab(5); return; }
+          const eid = arg.join(' ');
+          try {
+            const cd = await rpc.call('case', {entity: eid});
             setReveal(motion ? 0 : cd.rows.length);
             setSess(s => ({...s, caseData: cd}));
+            setTab(5);
+          } catch (e: any) {
+            setTab(6);
+            show(`case ${eid}`, String(e?.message ?? e));
           }
           return;
+        }
         case 'why': case 'timeline': case 'compare': {
           setTab(6);
           if (!arg[0]) { show(c, `usage: /${c} <${c === 'timeline' ? 'case id' : 'transaction id'}>`); return; }
