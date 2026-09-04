@@ -252,7 +252,9 @@ strikeone tui --source yourdata.parquet   # uses .strikeone.toml beside it
 
 Seven panels (CONNECT, AUDIT, ROUTE, ECONOMICS, STREAM, CASE, AI), fully
 keyboard-driven, offline over stdio to the local Python core - and a
-command line inside the session: press `/` and type, Claude-Code style:
+an always-visible input box, Claude-Code style - no mode key, just
+type and press enter (live suggestions, tab-complete, history, click to
+move the cursor):
 
 ```
 /audit 50            re-run the audit at your real review capacity

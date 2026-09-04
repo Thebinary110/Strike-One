@@ -20,26 +20,24 @@ const Sentence = ({text, width}: {text: string; width: number}) => (
 );
 
 // ------------------------------------------------------------- CONNECT
-export const Connect = ({s, width, pathEd}: {s: Session; width: number;
-                         pathEd: Ed | null}) => (
+export const Connect = ({s, width}: {s: Session; width: number}) => (
   <Box flexDirection="column" gap={1}>
     <Banner width={width} />
     <Text bold>Point strikeone at labelled transactions. Nothing leaves this
  machine: no telemetry, no network calls.</Text>
     <Box flexDirection="column">
-      <Text><Text bold color={C.accent}>[i]</Text>  the frozen IEEE-CIS worked
- example (proves the method; not a deployable model)</Text>
-      <Text><Text bold color={C.accent}>[s]</Text>  synthetic demo, generated
- on the fly and labelled as such</Text>
-      <Text><Text bold color={C.accent}>[p]</Text>  a path to your own
- parquet/CSV (uses the mapping in .strikeone.toml; set it up once with
- `strikeone check --map ... --save-config`)</Text>
+      <Text bold>Type a command below and press enter:</Text>
+      <Text><Text bold color={C.accent}>  example synthetic </Text>
+ - the instant demo, generated data, everything works on it</Text>
+      <Text><Text bold color={C.accent}>  onboard yourfile.csv </Text>
+ - map your own export (a wizard asks only where it matters)</Text>
+      <Text><Text bold color={C.accent}>  source yourfile.csv </Text>
+ - load a file you already mapped</Text>
+      <Text><Text bold color={C.accent}>  example ieee-cis </Text>
+ - the frozen IEEE-CIS study (needs the repo build; not a deployable
+ model)</Text>
     </Box>
-    {pathEd !== null && (
-      <Text>path: <EditorText ed={pathEd} /><Text color={C.dim}> (enter to
- load, esc to cancel)</Text></Text>
-    )}
-    {s.status === 'loading' && <Text color={C.dim}>loading {s.label} ...</Text>}
+        {s.status === 'loading' && <Text color={C.dim}>loading {s.label} ...</Text>}
     {s.status === 'error' && (
       <Box flexDirection="column">
         <Text color={C.harm} bold>could not load</Text>
@@ -416,12 +414,13 @@ export const Ai = ({s, width}: {s: Session; width: number}) => {
     return (
       <Box flexDirection="column" gap={1}>
         <Text bold>ASK ABOUT A DECISION</Text>
-        <Text color={C.dim}>{`press / then type:
+        <Text color={C.dim}>{`type below and press enter:
   why <transaction id>       why this decision, with validated citations
   timeline <case id>         one case, quiet period to covered run
   compare <transaction id>   blocklist lane vs scorer, and why they diverged
   evidence why <txn>         the raw evidence contract (no model needed)
-  provider                   where narration requests would go`}</Text>
+  provider                   where narration requests would go
+(grab ids from the STREAM or CASE panels)`}</Text>
         <Text color={C.dim} wrap="wrap">The model only narrates decisions the
  engine already made; every number and decision word it outputs is re-checked
  against the evidence contract before it reaches this screen.</Text>

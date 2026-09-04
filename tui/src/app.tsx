@@ -5,6 +5,34 @@ import {C, Ed, edApply, edNew, EditorText, Rule} from './ui.js';
 import {Ai, Audit, Case, Connect, Econ, Route, Session, Stream, Wizard, Wiz} from './screens.js';
 
 const TABS = ['CONNECT', 'AUDIT', 'ROUTE', 'ECONOMICS', 'STREAM', 'CASE', 'AI'];
+
+// live suggestions under the input box, Claude-Code style
+const PALETTE: Array<{fill: string; desc: string}> = [
+  {fill: 'audit',    desc: 'the corrected evaluation (audit 50 = at 50 reviews/day)'},
+  {fill: 'why ',      desc: 'why one transaction got its decision (AI, cited)'},
+  {fill: 'timeline ', desc: 'narrate one fraud case (entity id)'},
+  {fill: 'compare ',  desc: 'blocklist lane vs scorer on one transaction'},
+  {fill: 'evidence why ', desc: 'the raw evidence for a transaction (no AI)'},
+  {fill: 'onboard ',  desc: 'map a new file (wizard; label always confirmed)'},
+  {fill: 'source ',   desc: 'load a mapped file'},
+  {fill: 'example synthetic', desc: 'load the instant demo data'},
+  {fill: 'capacity ', desc: 're-run the audit at your real reviews/day'},
+  {fill: 'case ',     desc: 'inspect one entity\u2019s case'},
+  {fill: 'route',    desc: 'blocklist-lane lift, on vs off'},
+  {fill: 'policy ',   desc: 'reprice decisions (policy e=0.8 s=0.5)'},
+  {fill: 'stream',   desc: 'watch the decision stream'},
+  {fill: 'provider', desc: 'where AI requests would go'},
+  {fill: 'setup ollama ', desc: 'configure a local AI model'},
+  {fill: 'pause',    desc: 'pause/resume the stream'},
+  {fill: 'next',     desc: 'next featured case'},
+  {fill: 'help',     desc: 'all commands and keys'},
+  {fill: 'quit',     desc: 'leave'},
+];
+function suggest(text: string): Array<{fill: string; desc: string}> {
+  const t = text.trimStart().replace(/^\//, '').toLowerCase();
+  if (!t) return [];
+  return PALETTE.filter(p => p.fill.startsWith(t) && p.fill.trim() !== t);
+}
 const CENTRAL = {m: 0.15, a: 0.125, e: 0.775, c_h: 30.0};
 
 export const App = ({initialExample, initialSource, frameTab, motion}: {
@@ -25,8 +53,7 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
   const [streamPos, setStreamPos] = useState(0);
   const [caseIdx, setCaseIdx] = useState(0);
   const [reveal, setReveal] = useState(0);
-  const [pathEd, setPathEd] = useState<Ed | null>(null);
-  const [cmdEd, setCmdEd] = useState<Ed | null>(null);
+  const [cmdEd, setCmdEd] = useState<Ed>(edNew());
   const [note, setNote] = useState<string | null>(null);
   const hist = useRef<string[]>([]);
   const histIdx = useRef(-1);
@@ -47,19 +74,17 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
   const CMD_TEXT_X = 6;   // app pad + bar border + bar pad + '/ ' prompt
   useEffect(() => {
     if (process.stdin.isTTY !== true) return;
-    if (cmdEd !== null) stdout.write('\x1b[?1000h\x1b[?1006h');
-    else stdout.write('\x1b[?1000l\x1b[?1006l');
+    stdout.write('\x1b[?1000h\x1b[?1006h');
     return () => { stdout.write('\x1b[?1000l\x1b[?1006l'); };
-  }, [cmdEd !== null]);
+  }, []);
   useEffect(() => {
     if (process.stdin.isTTY !== true) return;
     const onData = (d: Buffer) => {
       const m = /\x1b\[<0;(\d+);\d+M/.exec(d.toString('latin1'));
       if (!m) return;
       const x = Number(m[1]);
-      setCmdEd(ed => ed === null ? ed
-        : {...ed, cur: Math.max(0, Math.min(ed.text.length,
-                                            x - CMD_TEXT_X))});
+      setCmdEd(ed => ({...ed, cur: Math.max(0, Math.min(ed.text.length,
+                                                         x - CMD_TEXT_X))}));
     };
     process.stdin.on('data', onData);
     return () => { process.stdin.off('data', onData); };
@@ -288,7 +313,11 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
     try {
       switch (c) {
         case 'help': setHelp(true); return;
-        case 'quit': case 'exit': exit(); return;
+        case 'quit': case 'exit': case 'q': exit(); return;
+        case '1': case '2': case '3': case '4': case '5': case '6':
+        case '7': setTab(Number(c) - 1); return;
+        case 'pause': setPaused(v => !v); setTab(4); return;
+        case 'next': void nextCase(); setTab(5); return;
         case 'example': load({example: arg[0] ?? 'synthetic'}); return;
         case 'source': case 'open':
           if (arg[0]) load({source: arg[0]});
@@ -431,65 +460,62 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
       } else setWiz({...wiz, ed: r.ed});
       return;
     }
-    if (cmdEd !== null) {
-      if (key.upArrow || key.downArrow) {
-        const h = hist.current;
-        if (h.length) {
-          histIdx.current = key.upArrow
-            ? Math.min(histIdx.current + 1, h.length - 1)
-            : Math.max(histIdx.current - 1, -1);
-          setCmdEd(edNew(histIdx.current < 0
-            ? '' : h[h.length - 1 - histIdx.current]));
-        }
+    // ------- chat-first input: the box is ALWAYS focused. Type, enter.
+    // tab completes a suggestion when typing, switches panels otherwise;
+    // up/down = history; left/right when empty = budget row (AUDIT/ROUTE)
+    if (key.upArrow || key.downArrow) {
+      if (tab === 3 && cmdEd.text === '') {   // econ selection stays on arrows
+        if (key.downArrow) setEconSel(v => (v + 1) % 4);
+        else setEconSel(v => (v + 3) % 4);
         return;
       }
-      const r = edApply(cmdEd, input, key);
-      if (r.submit === undefined && !r.cancel && r.ed === cmdEd) return;
-      if (r.cancel) { setCmdEd(null); return; }
-      if (r.submit !== undefined) {
-        const c = r.submit.trim();
-        if (c) { hist.current.push(c); histIdx.current = -1; }
-        setCmdEd(null); setNote(null);
-        if (c) void runCommand(c);
+      const h = hist.current;
+      if (h.length) {
+        histIdx.current = key.upArrow
+          ? Math.min(histIdx.current + 1, h.length - 1)
+          : Math.max(histIdx.current - 1, -1);
+        setCmdEd(edNew(histIdx.current < 0
+          ? '' : h[h.length - 1 - histIdx.current]));
+      }
+      return;
+    }
+    if ((key.leftArrow || key.rightArrow) && cmdEd.text === '') {
+      const nb = sess.audit?.budgets?.length ?? 0;
+      if ((tab === 1 || tab === 2) && nb) {
+        setCapIdx(i => key.rightArrow ? Math.min(i + 1, nb - 1)
+                                      : Math.max(i - 1, 0));
         return;
       }
-      setCmdEd(r.ed);
+      if (tab === 3) { econAdjust(key.rightArrow ? 1 : -1); return; }
       return;
     }
-    if (input === '/') { setCmdEd(edNew()); setHelp(false); return; }
-    if (pathEd !== null) {
-      const r = edApply(pathEd, input, key);
-      if (r.submit === undefined && !r.cancel && r.ed === pathEd) return;
-      if (r.cancel) { setPathEd(null); return; }
-      if (r.submit !== undefined) { setPathEd(null); load({source: r.submit}); return; }
-      setPathEd(r.ed);
+    if (key.tab) {
+      const sugg = suggest(cmdEd.text);
+      if (!key.shift && cmdEd.text.trim() !== '' && sugg.length) {
+        setCmdEd(edNew(sugg[0].fill));
+        return;
+      }
+      setTab(t => (t + (key.shift ? 6 : 1)) % 7);
       return;
     }
-    if (input === 'q') { exit(); return; }
-    if (input === '?') { setHelp(h => !h); return; }
-    if (key.tab && key.shift) { setTab(t => (t + 6) % 7); return; }
-    if (key.tab) { setTab(t => (t + 1) % 7); return; }
-    if (/[1-7]/.test(input)) { setTab(Number(input) - 1); return; }
-    const nb = sess.audit?.budgets?.length ?? 0;
-    if (tab === 0) {
-      if (input === 'i') load({example: 'ieee-cis'});
-      if (input === 's') load({example: 'synthetic'});
-      if (input === 'p') setPathEd(edNew());
-    } else if (tab === 1 || tab === 2) {
-      if ((input === 'l' || key.rightArrow) && nb)
-        setCapIdx(i => Math.min(i + 1, nb - 1));
-      if ((input === 'h' || key.leftArrow) && nb)
-        setCapIdx(i => Math.max(i - 1, 0));
-    } else if (tab === 3) {
-      if (input === 'j' || key.downArrow) setEconSel(s => (s + 1) % 4);
-      if (input === 'k' || key.upArrow) setEconSel(s => (s + 3) % 4);
-      if (input === 'l' || key.rightArrow) econAdjust(1);
-      if (input === 'h' || key.leftArrow) econAdjust(-1);
-    } else if (tab === 4) {
-      if (input === ' ') setPaused(p => !p);
-    } else if (tab === 5) {
-      if (input === 'n') nextCase();
+    if (key.escape) {
+      if (cmdEd.text !== '') setCmdEd(edNew());
+      else setHelp(false);
+      return;
     }
+    const r = edApply(cmdEd, input, key);
+    if (r.submit === undefined && !r.cancel && r.ed === cmdEd) return;
+    if (r.submit !== undefined) {
+      const c = r.submit.trim().replace(/^\//, '');
+      setCmdEd(edNew()); setNote(null);
+      if (c) {
+        hist.current.push(c); histIdx.current = -1;
+        setHelp(false);
+        void runCommand(c);
+      }
+      return;
+    }
+    if (!r.cancel) setCmdEd(r.ed);
   }, {isActive: process.stdin.isTTY === true});
 
   const shownRows = useMemo(() => {
@@ -530,7 +556,7 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
       <Rule width={width - 2} />
       <Box marginTop={1} flexDirection="column" minHeight={20}>
         {help ? <Help /> : (
-          tab === 0 ? <Connect s={sess} width={width} pathEd={pathEd} /> :
+          tab === 0 ? <Connect s={sess} width={width} /> :
           tab === 1 ? <Audit s={sess} capIdx={capIdx} width={width} /> :
           tab === 2 ? <Route s={sess} width={width} /> :
           tab === 3 ? <Econ s={sess} params={params} sel={econSel}
@@ -543,40 +569,49 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
         )}
       </Box>
       <Rule width={width - 2} />
-      {cmdEd !== null ? (
-        <Box borderStyle="round" borderColor={C.accent} paddingX={1}>
-          <Text bold color={C.accent}>{'/ '}</Text>
-          <EditorText ed={cmdEd} />
-          <Text color={C.dim}>{'  enter run · esc close · '}
-            {'arrows/click move · up history'}</Text>
-        </Box>
-      ) : note ? (
-        <Text color={C.waste}>{note}</Text>
-      ) : (
-        <Text color={C.dim} wrap="truncate">
-        we ship the method and the measurement; you bring the scorer. The
- IEEE-CIS run is a worked example, not a deployable model.
-        </Text>
-      )}
+      {(() => {
+        const sugg = cmdEd.text.trim() ? suggest(cmdEd.text) : [];
+        return (
+          <Box flexDirection="column">
+            <Box borderStyle="round" borderColor={C.accent} paddingX={1}>
+              <Text bold color={C.accent}>{'> '}</Text>
+              <EditorText ed={cmdEd} />
+              {cmdEd.text === '' ? (
+                <Text color={C.dim}>{wiz
+                  ? ' onboarding in progress above - esc aborts it'
+                  : ' try: audit 50 · why <txn> · onboard <file> · help'}
+                </Text>
+              ) : null}
+            </Box>
+            {sugg.slice(0, 3).map(g => (
+              <Text key={g.fill} color={C.dim}>
+                {'    '}<Text bold>{g.fill}</Text>{'  '}{g.desc}
+              </Text>
+            ))}
+            <Text color={C.dim}>
+              {note ?? 'enter run · tab complete / panels · up-down history · click moves cursor · q + enter quits'}
+            </Text>
+          </Box>
+        );
+      })()}
     </Box>
   );
 };
 
 const Help = () => (
   <Box flexDirection="column" gap={1}>
-    <Text bold>Keys</Text>
-    <Text color={C.dim}>{`  /                 command line (full editing: arrows + ctrl-a/e/u/w,
-                    mouse click moves the cursor, up/down = history):
-                    /audit 50 . /why <txn> . /timeline <case>
-                    /compare <txn> . /evidence why <txn> . /policy e=0.8 s=0.5
-                    /capacity 50 . /case <entity> . /provider . /source <path>
-  tab / shift-tab   next / previous panel
-  1..7              jump to a panel
-  h l  (or arrows)  change budget (AUDIT, ROUTE) or adjust a value (ECONOMICS)
-  j k               select an economics input
-  space             pause the decision stream
-  n                 next case (CASE)
-  ?                 toggle this help     q  quit`}</Text>
+    <Text bold>Just type in the box below and press enter.</Text>
+    <Text color={C.dim}>{`  audit 50            the corrected evaluation at 50 reviews/day
+  why <txn>           why one decision (AI, citations validated)
+  timeline <case>     narrate one fraud case      compare <txn>  two systems
+  evidence why <txn>  the raw evidence, no AI     provider       AI egress
+  onboard <file>      map a new file (wizard)     source <file>  load it
+  example synthetic   instant demo data           policy e=0.8   reprice
+  capacity 50 . case <id> . route . stream . pause . next . 1-7 . quit
+
+keys: enter run . tab complete (or switch panels when empty) . up/down
+history . left/right budget row or cursor . click moves the cursor .
+esc clear . ctrl+c quit`}</Text>
     <Text color={C.dim} wrap="wrap">Every figure is computed live by the local
  Python core over stdio. No HTTP, no ports, no telemetry.</Text>
   </Box>
