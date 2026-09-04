@@ -269,8 +269,12 @@ move the cursor):
 /setup ollama <model>            configure the AI provider from inside
 ```
 
-The model never chooses what runs: the command line maps 1:1 onto the
-same deterministic engine calls the CLI uses. The input line is a real
+Anything that isn't a command is a **question**: type "how many fraud
+cases are there?" and the model answers from a hashed contract of the
+session's own computed numbers - the citation validator still checks
+every figure before it prints. Commands themselves never touch the
+model: the command line maps 1:1 onto the same deterministic engine
+calls the CLI uses. The input line is a real
 editor - block cursor, arrow keys, ctrl-a/e/u/w, click to move the
 cursor, up/down for history, paste-safe.
 
