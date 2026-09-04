@@ -19,7 +19,7 @@ USAGE
                                       strikeone check FILE --map ... --save-config)
   strikeone tui --no-motion           disable animations
 
-PANELS (number keys or tab / shift-tab)
+PANELS (tab / shift-tab, or type the number + enter)
   1 CONNECT     point at data, see the contract check
   2 AUDIT       your headline metric vs fraud cases stopped first-attempt
   3 ROUTE       your scorer with vs without a blocklist lane
