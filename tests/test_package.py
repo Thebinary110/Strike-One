@@ -543,3 +543,20 @@ def test_chat_overview_contract_and_disabled_default(tmp_path, monkeypatch):
         assert isinstance(i["value"], (str, int, float, type(None)))
     r = s.chat({"question": "how many fraud cases?"})
     assert r.get("disabled") and "setup ollama" in r["text"]
+
+
+def test_rpc_stream_raw_fallback_without_score(tmp_path, monkeypatch):
+    """No score column: stream replays the raw transaction flow (marked
+    raw) instead of erroring, so the panel is never dead."""
+    from strikeone import contract as C
+    from strikeone import examples
+    from strikeone.rpc import Session
+
+    monkeypatch.chdir(tmp_path)
+    raw, m = examples.resolve("synthetic")
+    df = C.apply_mapping(raw, m).drop(columns=["score"])
+    s = Session(); s.df = df; s.mapping = m; s._arrays = None
+    out = s.stream({"limit": 10})
+    assert out.get("raw") is True
+    assert len(out["rows"]) == 10
+    assert out["rows"][0]["id"] and "day" in out["rows"][0]

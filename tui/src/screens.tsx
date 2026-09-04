@@ -6,6 +6,7 @@ export type Session = {
   status: 'none' | 'loading' | 'error' | 'ready';
   label?: string;
   error?: string;
+  phase?: string;
   meta?: any; check?: any; audit?: any; route?: any;
   policy?: any; ranges?: any; worstCorner?: any;
   stream?: any; featured?: any[]; caseData?: any;
@@ -37,7 +38,7 @@ export const Connect = ({s, width}: {s: Session; width: number}) => (
  - the frozen IEEE-CIS study (needs the repo build; not a deployable
  model)</Text>
     </Box>
-        {s.status === 'loading' && <Text color={C.dim}>loading {s.label} ...</Text>}
+        {s.status === 'loading' && <Text color={C.accent}>● loading {s.label} - {s.phase ?? 'working'} ...</Text>}
     {s.status === 'error' && (
       <Box flexDirection="column">
         <Text color={C.harm} bold>could not load</Text>
@@ -291,28 +292,17 @@ export const Econ = ({s, params, sel, width}: {s: Session; params: any;
 // ---------------------------------------------------------------- STREAM
 export const Stream = ({s, shownRows, paused, width}: {s: Session;
                         shownRows: any[]; paused: boolean; width: number}) => {
-  if (!s.stream) {
-    if (s.status === 'ready' && s.meta && !s.meta.has_score)
-      return (
-        <Box flexDirection="column" gap={1}>
-          <Text bold>Nothing to replay: this file has no score column.</Text>
-          <Text color={C.dim} wrap="wrap">The stream replays YOUR scorer's
- decisions transaction by transaction. This dataset was mapped without a
- score, so there are no decisions to show - the CASE panel (6) still
- animates each fraud case from the labels alone. To see the stream,
- score the file with your model and remap it (onboard again, or
- --map score={'<column>'}).</Text>
-        </Box>
-      );
-    return <NeedData />;
-  }
+  if (!s.stream) return <NeedData />;
+  const raw = s.stream.raw;
   return (
     <Box flexDirection="column" gap={1}>
       <Text color={C.dim}>
-        replaying the decisions at {fmt(s.stream.per_day)} alerts/day
-        ({fmt(s.stream.n_events)} events in the window)
+        {raw
+          ? `replaying the raw transaction flow (no score column mapped; ${fmt(s.stream.n_events)} transactions)`
+          : `replaying the decisions at ${fmt(s.stream.per_day)} alerts/day (${fmt(s.stream.n_events)} events in the window)`}
         {paused ? '   PAUSED - space resumes' : '   space pauses (with the box empty)'}
       </Text>
+      {raw ? <Text color={C.dim} wrap="wrap">map a score column (onboard again with --map score) to see approve/step-up/block decisions here instead.</Text> : null}
       <Box flexDirection="column">
         <Text color={C.dim}>
           {'   id             day     amount   route            '}
@@ -324,9 +314,13 @@ export const Stream = ({s, shownRows, paused, width}: {s: Session;
                   ? '#0d3524' : undefined}>
             {`  ${String(r.id ?? '').slice(0, 13).padEnd(13)}`}
             {`  ${r.day.toFixed(2).padStart(6)}  ${r.amount.toFixed(2).padStart(9)}  `}
-            {r.lane === 'auto-block'
-              ? <Text color={C.harm}>auto-block, no review</Text>
-              : <Text color={C.accent}>review</Text>}
+            {raw
+              ? (r.role === 1 ? <Text color={C.harm}>FRAUD (first hit)</Text>
+                 : r.label === 1 ? <Text color={C.waste}>fraud (later)</Text>
+                 : <Text color={C.dim}>ok</Text>)
+              : r.lane === 'auto-block'
+                ? <Text color={C.harm}>auto-block, no review</Text>
+                : <Text color={C.accent}>review</Text>}
             {'   '}
             {r.caught_fs
               ? <Text color={C.stop} bold>FIRST HIT, CAUGHT</Text>
@@ -505,6 +499,11 @@ export const Wizard = ({w, width}: {w: Wiz; width: number}) => {
             <Text color={C.waste} wrap="wrap">    label is always confirmed
  by a human: a wrong label corrupts every downstream number, and no
  statistical check can verify its meaning</Text>
+          ) : null}
+          {t === 'entity' && !row?.source ? (
+            <Text color={C.dim} wrap="wrap">    the entity is who fraud
+ travels with - usually a card, customer, account, or device column
+ (type its name; combine several with a+b)</Text>
           ) : null}
           <Text>
             {'    column'}{t === 'entity' ? '(s, a+b for several)' : ''}
