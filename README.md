@@ -275,8 +275,9 @@ session's own computed numbers - the citation validator still checks
 every figure before it prints. Commands themselves never touch the
 model: the command line maps 1:1 onto the same deterministic engine
 calls the CLI uses. The input line is a real
-editor - block cursor, arrow keys, ctrl-a/e/u/w, click to move the
-cursor, up/down for history, paste-safe.
+editor - block cursor, arrow keys, ctrl-a/e/u/w, up/down for history,
+paste-safe. Mouse click-to-cursor is opt-in (`mouse on`); by default
+your terminal's native text selection and copy/paste work normally.
 
 ## The AI layer (optional, off by default)
 

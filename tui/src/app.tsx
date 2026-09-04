@@ -2,7 +2,7 @@ import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {Box, Text, useApp, useInput, useStdout} from 'ink';
 import {Rpc} from './rpc.js';
 import {C, Ed, edApply, edNew, EditorText, Rule} from './ui.js';
-import {Ai, Audit, Case, Connect, Econ, Route, Session, Stream, Wizard, Wiz} from './screens.js';
+import {Ai, Audit, Case, Connect, Econ, Route, Session, Stream, Wizard, Wiz, wizPrompt} from './screens.js';
 
 const TABS = ['CONNECT', 'AUDIT', 'ROUTE', 'ECONOMICS', 'STREAM', 'CASE', 'AI'];
 
@@ -25,6 +25,8 @@ const PALETTE: Array<{fill: string; desc: string}> = [
   {fill: 'setup ollama ', desc: 'configure a local AI model'},
   {fill: 'pause',    desc: 'pause/resume the stream'},
   {fill: 'next',     desc: 'next featured case'},
+  {fill: 'mouse off', desc: 'native text selection/copy (the default)'},
+  {fill: 'mouse on',  desc: 'click moves the cursor (disables selection)'},
   {fill: 'help',     desc: 'all commands and keys'},
   {fill: 'quit',     desc: 'leave'},
 ];
@@ -70,15 +72,18 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
     return () => { stdout.off('resize', onResize); rpc.kill(); };
   }, []);
 
-  // mouse-click cursor positioning in the command bar: xterm SGR mouse
-  // reporting while the bar is open; a raw stdin listener (Ink cannot
-  // parse mouse reports) maps the click column onto the cursor index.
+  // mouse-click cursor positioning: OFF by default, because xterm mouse
+  // reporting captures ALL mouse events - including drag-to-select - so
+  // leaving it on breaks the terminal's native copy/paste selection.
+  // Opt in with the 'mouse on' command if you want click-to-position and
+  // don't need native selection; 'mouse off' (the default) restores it.
+  const [mouseOn, setMouseOn] = useState(false);
   const CMD_TEXT_X = 6;   // app pad + bar border + bar pad + '/ ' prompt
   useEffect(() => {
     if (process.stdin.isTTY !== true) return;
-    stdout.write('\x1b[?1000h\x1b[?1006h');
+    if (mouseOn) stdout.write('\x1b[?1000h\x1b[?1006h');
     return () => { stdout.write('\x1b[?1000l\x1b[?1006l'); };
-  }, []);
+  }, [mouseOn]);
   useEffect(() => {
     if (process.stdin.isTTY !== true) return;
     const onData = (d: Buffer) => {
@@ -404,6 +409,22 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
           show('provider', r.text);
           return;
         }
+        case 'mouse': {
+          const v = (arg[0] ?? '').toLowerCase();
+          if (v !== 'on' && v !== 'off') {
+            setNote('usage: mouse on | mouse off (off is the default - '
+                    + 'native text selection works; on trades that away '
+                    + 'for click-to-position-cursor)');
+            return;
+          }
+          setMouseOn(v === 'on');
+          setNote(v === 'on'
+            ? 'mouse on: click moves the cursor, but your terminal\'s '
+              + 'native text selection is now captured by the app'
+            : 'mouse off: your terminal\'s native text selection (drag to '
+              + 'select, copy as usual) works again');
+          return;
+        }
         case 'onboard': {
           if (!arg[0]) { setTab(6); show('onboard', 'usage: /onboard <file.csv|parquet>'); return; }
           void startOnboard(arg[0]);
@@ -612,16 +633,29 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
       </Box>
       <Rule width={width - 2} />
       {(() => {
-        const sugg = cmdEd.text.trim() ? suggest(cmdEd.text) : [];
+        const sugg = !wiz && cmdEd.text.trim() ? suggest(cmdEd.text) : [];
+        // ONE real input box, always in the same place: while onboarding
+        // it hosts the wizard's own question, never a second inert copy.
+        const inWizEditor = wiz && (wiz.phase === 'ask' || wiz.phase === 'delay');
+        const activeEd = inWizEditor ? wiz.ed : cmdEd;
         return (
           <Box flexDirection="column">
-            <Box borderStyle="round" borderColor={C.accent} paddingX={1}>
-              <Text bold color={C.accent}>{'> '}</Text>
-              <EditorText ed={cmdEd} />
-              {cmdEd.text === '' ? (
-                <Text color={C.dim}>{wiz
-                  ? ' onboarding in progress above - esc aborts it'
-                  : ' type a command (audit 50 · why <txn> · help) or just ask a question'}
+            <Box borderStyle="round"
+                 borderColor={wiz ? C.waste : C.accent} paddingX={1}>
+              <Text bold color={wiz ? C.waste : C.accent}>
+                {wiz ? '? ' : '> '}
+              </Text>
+              {wiz && !inWizEditor ? (
+                <Text bold>{wizPrompt(wiz)}</Text>
+              ) : (
+                <>
+                  {wiz ? <Text color={C.dim}>{wizPrompt(wiz)}</Text> : null}
+                  <EditorText ed={activeEd} />
+                </>
+              )}
+              {!wiz && cmdEd.text === '' ? (
+                <Text color={C.dim}>
+                  {' type a command (audit 50 · why <txn> · help) or just ask a question'}
                 </Text>
               ) : null}
             </Box>
@@ -631,7 +665,10 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
               </Text>
             ))}
             <Text color={C.dim}>
-              {note ?? 'enter run · tab complete / panels · up-down history · click moves cursor · q + enter quits'}
+              {wiz
+                ? (inWizEditor ? 'enter submit · esc aborts the whole onboarding, nothing written'
+                              : 'y / n · esc aborts the whole onboarding, nothing written')
+                : (note ?? 'enter run · tab complete / panels · up-down history · mouse off by default (see: mouse on) · q + enter quits')}
             </Text>
           </Box>
         );
@@ -652,8 +689,9 @@ const Help = () => (
   capacity 50 . case <id> . route . stream . pause . next . 1-7 . quit
 
 keys: enter run . tab complete (or switch panels when empty) . up/down
-history . left/right budget row or cursor . click moves the cursor .
-esc clear . ctrl+c quit`}</Text>
+history . left/right budget row or cursor . esc clear . ctrl+c quit
+mouse: off by default so your terminal's native text selection/copy
+works normally. 'mouse on' trades that away for click-to-position.`}</Text>
     <Text color={C.dim} wrap="wrap">Every figure is computed live by the local
  Python core over stdio. No HTTP, no ports, no telemetry.</Text>
   </Box>
