@@ -14,7 +14,7 @@ export type Session = {
 
 const Sentence = ({text, width}: {text: string; width: number}) => (
   <Box borderStyle="round" borderColor={C.accent} paddingX={2}
-       width={Math.min(width, 96)}>
+       width={Math.min(width - 2, 140)}>
     <Text bold wrap="wrap">{text}</Text>
   </Box>
 );
@@ -46,7 +46,7 @@ export const Connect = ({s, width}: {s: Session; width: number}) => (
     )}
     {s.status === 'ready' && s.check && (
       <Box flexDirection="column">
-        <Rule width={Math.min(width - 2, 96)} />
+        <Rule width={Math.min(width - 2, 140)} />
         <Text bold>
           contract check: {s.check.ok
             ? <Text color={C.stop}>PASS</Text>
@@ -97,7 +97,7 @@ export const Audit = ({s, capIdx, width}: {s: Session; capIdx: number;
       </Box>
       {a.headline && b && (
         <>
-          <Rule width={Math.min(width - 2, 96)} />
+          <Rule width={Math.min(width - 2, 140)} />
           <Text bold>Your scorer
             <Text color={C.dim}>  headline AP {a.headline.ap.toFixed(4)},
             ROC-AUC {a.headline.roc_auc.toFixed(4)}   |   h/l to change the
@@ -147,7 +147,7 @@ export const Audit = ({s, capIdx, width}: {s: Session; capIdx: number;
 export const Route = ({s, width}: {s: Session; width: number}) => {
   const r = s.route;
   if (!r) return <NeedData />;
-  const w = Math.min(width - 14, 84);
+  const w = Math.min(width - 14, 130);
   const plot = r.curve?.length
     ? braillePlot(
         [
@@ -224,7 +224,7 @@ export const Econ = ({s, params, sel, width}: {s: Session; params: any;
  The IEEE-CIS worked example includes one.</Text>;
   const p = s.policy;
   const ranges = s.ranges ?? {};
-  const barW = Math.min(width - 30, 60);
+  const barW = Math.min(width - 30, 90);
   return (
     <Box flexDirection="column" gap={1}>
       <Text color={C.dim}>Set what mistakes cost you; j/k select, h/l adjust.
@@ -252,7 +252,7 @@ export const Econ = ({s, params, sel, width}: {s: Session; params: any;
         <Box flexDirection="column" gap={1}>
           <Box flexDirection="column">
             <Text bold>Recommended actions across the window</Text>
-            <Bar width={Math.min(width - 8, 80)} parts={[
+            <Bar width={Math.min(width - 8, 120)} parts={[
               {frac: p.mix.pct[0] / 100, color: C.stop, ch: '█'},
               {frac: p.mix.pct[1] / 100, color: C.waste, ch: '█'},
               {frac: p.mix.pct[2] / 100, color: C.harm, ch: '█'},
@@ -341,12 +341,12 @@ export const Stream = ({s, shownRows, paused, width}: {s: Session;
 };
 
 // ----------------------------------------------------------------- CASE
-export const Case = ({s, reveal, width}: {s: Session; reveal: number;
+export const Case = ({s, reveal, width, rows: _rows}: {s: Session; reveal: number; rows?: number;
                       width: number}) => {
   const c = s.caseData;
   if (!c) return <NeedData />;
   const rows = c.rows as any[];
-  const w = Math.min(width - 10, 100);
+  const w = Math.min(width - 10, 150);
   const lo = rows[0].day, hi = rows[rows.length - 1].day + 1e-9;
   const X = (d: number) =>
     Math.min(w - 1, Math.max(0, Math.round(((d - lo) / (hi - lo)) * (w - 1))));
@@ -453,7 +453,7 @@ export const Ai = ({s, width}: {s: Session; width: number}) => {
       </Box>
     );
   return (
-    <Box flexDirection="column" gap={1} width={Math.min(width - 2, 100)}>
+    <Box flexDirection="column" gap={1} width={Math.min(width - 2, 140)}>
       <Text bold inverse>{` ${a.title} `}</Text>
       {a.busy ? <Text color={C.waste}>{a.text}</Text>
               : <Text wrap="wrap">{a.text}</Text>}
@@ -476,7 +476,7 @@ export const Wizard = ({w, width}: {w: Wiz; width: number}) => {
   const t = w.queue[w.idx];
   const row = w.rows.find((r: any) => r.target === t);
   return (
-    <Box flexDirection="column" gap={1} width={Math.min(width - 2, 100)}>
+    <Box flexDirection="column" gap={1} width={Math.min(width - 2, 140)}>
       <Text bold inverse>{` ONBOARD ${w.source} `}</Text>
       {w.aiNote ? <Text color={C.waste}>{w.aiNote}</Text> : null}
       {autos.length ? (

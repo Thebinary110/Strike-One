@@ -45,6 +45,8 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
                                     h: stdout.rows ?? 34});
   const [tab, setTab] = useState(frameTab ?? 0);
   const [help, setHelp] = useState(false);
+  // rows the scrolling views can show: terminal height minus fixed chrome
+  const bodyRows = Math.max(8, (size.h ?? 34) - 16);
   const [sess, setSess] = useState<Session>({status: 'none'});
   const [capIdx, setCapIdx] = useState(0);
   const [params, setParams] = useState<any>({...CENTRAL});
@@ -540,9 +542,10 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
   const shownRows = useMemo(() => {
     const rows = sess.stream?.rows ?? [];
     if (!rows.length) return [];
-    const end = motion ? (streamPos % (rows.length + 12)) : 12;
-    return rows.slice(Math.max(0, end - 12), Math.max(end, 12));
-  }, [sess.stream, streamPos, motion]);
+    const win = Math.max(6, bodyRows - 3);   // scales with terminal height
+    const end = motion ? (streamPos % (rows.length + win)) : win;
+    return rows.slice(Math.max(0, end - win), Math.max(end, win));
+  }, [sess.stream, streamPos, motion, bodyRows]);
 
   const width = size.w;
   const narrow = width < 100;
@@ -573,7 +576,8 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
         )}
       </Box>
       <Rule width={width - 2} />
-      <Box marginTop={1} flexDirection="column" minHeight={20}>
+      <Box marginTop={1} flexDirection="column"
+           minHeight={Math.max(16, bodyRows)}>
         {help ? <Help /> : (
           tab === 0 ? <Connect s={sess} width={width} /> :
           tab === 1 ? <Audit s={sess} capIdx={capIdx} width={width} /> :
@@ -582,7 +586,7 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
                             width={width} /> :
           tab === 4 ? <Stream s={sess} shownRows={shownRows} paused={paused}
                               width={width} /> :
-          tab === 5 ? <Case s={sess} reveal={reveal} width={width} /> :
+          tab === 5 ? <Case s={sess} reveal={reveal} width={width} rows={bodyRows} /> :
           wiz       ? <Wizard w={wiz} width={width} /> :
                       <Ai s={sess} width={width} />
         )}
