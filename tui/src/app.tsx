@@ -94,41 +94,54 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
 
   async function load(kind: {example?: string; source?: string}) {
     const label = kind.example ?? kind.source!;
-    setSess({status: 'loading', label});
+    const ph = (phase: string) =>
+      setSess(s => ({...s, status: 'loading', label, phase}));
+    ph('reading the file');
     try {
       await rpc.call('init', kind.example
         ? {example: kind.example} : {source: kind.source});
+      ph('checking the contract');
       const [meta, check] = await Promise.all(
         [rpc.call('meta'), rpc.call('check')]);
       const next: Session = {status: 'ready', label, meta, check};
       setSess({...next});
       if (meta.has_label) {
+        ph(`computing the audit (${Number(meta.rows).toLocaleString()} rows)`);
         const [audit, route, featured] = await Promise.all([
           rpc.call('audit'), rpc.call('route_curve'), rpc.call('featured'),
         ]);
         next.audit = audit; next.route = route; next.featured = featured;
         const pi = audit.budgets?.findIndex((b: any) => b.primary) ?? 0;
         setCapIdx(Math.max(pi, 0));
-        setSess({...next});
-        if (meta.has_score) {
-          next.stream = await rpc.call('stream', {limit: 400});
-          setSess({...next});
-        }
+        setSess({...next, status: 'ready'});
+        ph('replaying the transaction stream');   // always: raw fallback ok
+        next.stream = await rpc.call('stream', {limit: 400});
+        setSess({...next, status: 'ready'});
         if (featured?.length) {
+          ph('building the case view');
           next.caseData = await rpc.call('case',
             {entity: featured[0].entity});
           setReveal(motion ? 0 : next.caseData.rows.length);
-          setSess({...next});
+          setSess({...next, status: 'ready'});
         }
         if (meta.has_p) {
+          ph('pricing the decision policy');
           const pol = await rpc.call('policy', {...CENTRAL, grid: true});
           next.policy = pol; next.ranges = pol.ranges;
           next.worstCorner = pol.worst_corner;
-          setSess({...next});
+          setSess({...next, status: 'ready'});
         }
       }
     } catch (e: any) {
-      setSess({status: 'error', label, error: String(e.message ?? e)});
+      const msg = String(e.message ?? e);
+      // P3: source before onboard -> point at the wizard, not a raw error
+      if (/no column mapping|mapping found/.test(msg) && kind.source) {
+        setSess({status: 'error', label,
+          error: `no mapping for ${kind.source} yet. Map it first:  ` +
+                 `onboard ${kind.source}`});
+      } else {
+        setSess({status: 'error', label, error: msg});
+      }
     }
   }
 
@@ -286,6 +299,8 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
       setWiz({...w, ed: edNew(), msg: 'delay must be a number of days'});
       return;
     }
+    setWiz({...w, phase: 'delay', ed: edNew(),
+             msg: 'validating the full file and writing the mapping...'});
     try {
       const r = await rpc.call('onboard_finish', {delay, overwrite});
       if (r.needs_overwrite) {
@@ -576,6 +591,10 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
         )}
       </Box>
       <Rule width={width - 2} />
+      {sess.status === 'loading' && (
+        <Text color={C.accent}>{'  \u25cf '}loading {sess.label} -{' '}
+          {sess.phase ?? 'working'} ...</Text>
+      )}
       <Box marginTop={1} flexDirection="column"
            minHeight={Math.max(16, bodyRows)}>
         {help ? <Help /> : (

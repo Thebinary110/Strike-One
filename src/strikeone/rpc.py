@@ -471,8 +471,10 @@ class Session:
     # --------------------------------------------------------- screens
     def stream(self, p):
         a = self.arrays()
-        if a["y"] is None or "score" not in a:
-            raise RuntimeError("stream needs labels and a score column")
+        if "score" not in self.df.columns:
+            return self._raw_stream(p)          # no scorer: replay the flow
+        if a["y"] is None:
+            raise RuntimeError("stream needs labels")
         per_day = int(p.get("per_day", 0)) or None
         if per_day is None:
             aud = self.audit({})
@@ -498,6 +500,28 @@ class Session:
             })
         return {"per_day": per_day, "n_events": int(len(events)),
                 "rows": rows}
+
+    def _raw_stream(self, p):
+        """No score column: there are no decisions to replay, so we replay
+        the raw transaction flow, marking labelled fraud. Honest fallback
+        so the STREAM panel is never dead on score-less data."""
+        a = self.arrays()
+        order = np.argsort(a["t"], kind="stable")
+        start, limit = int(p.get("start", 0)), int(p.get("limit", 400))
+        rows = []
+        for i in order[start:start + limit]:
+            rows.append({
+                "id": str(a["tb"][i]),
+                "day": round(float((a["t"][i] - a["day0"]) / 86400), 2),
+                "amount": round(float(a["amt"][i]), 2),
+                "entity": str(a["ent"][i]),
+                "lane": "review",
+                "caught_fs": bool(a["y"] is not None
+                                  and a["roles"][i] == episodes.ROLE_FIRST_STRIKE),
+                "role": int(a["roles"][i]) if a["y"] is not None else 0,
+            })
+        return {"per_day": None, "n_events": int(len(a["t"])),
+                "rows": rows, "raw": True}
 
     def featured(self, _p):
         a = self.arrays()
