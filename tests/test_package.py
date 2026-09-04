@@ -519,3 +519,27 @@ def test_rpc_slash_command_backends(tmp_path, monkeypatch):
     assert [b["per_day"] for b in a50["budgets"] if b["primary"]] == [50]
     a100 = s.audit({"capacity": 100})
     assert [b["per_day"] for b in a100["budgets"] if b["primary"]] == [100]
+
+
+def test_chat_overview_contract_and_disabled_default(tmp_path, monkeypatch):
+    """Free-form chat answers come from a hashed overview contract built
+    from the session's own computed numbers - deterministic, schema v1.0,
+    no raw rows - and chat is off until a provider is configured."""
+    from strikeone.ai import evidence as E
+    from strikeone.rpc import Session
+
+    monkeypatch.chdir(tmp_path)
+    s = Session()
+    s.init({"example": "synthetic"})
+    a = s._overview_contract()
+    b = s._overview_contract()
+    assert a == b, "overview contract must be deterministic"
+    assert list(a) == E.TOP_KEYS and a["command"] == "chat"
+    assert a["evidence_hash"] == E.canonical_hash(a)
+    feats = {i["feature"] for i in a["evidence"]}
+    assert {"rows", "fraud_cases", "first_hit_recall_at_budget",
+            "blocklist_coverable_share_of_hits"} <= feats
+    for i in a["evidence"]:
+        assert isinstance(i["value"], (str, int, float, type(None)))
+    r = s.chat({"question": "how many fraud cases?"})
+    assert r.get("disabled") and "setup ollama" in r["text"]

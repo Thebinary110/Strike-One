@@ -297,7 +297,7 @@ export const Stream = ({s, shownRows, paused, width}: {s: Session;
       <Text color={C.dim}>
         replaying the decisions at {fmt(s.stream.per_day)} alerts/day
         ({fmt(s.stream.n_events)} events in the window)
-        {paused ? '   PAUSED (space)' : '   space to pause'}
+        {paused ? '   PAUSED - space resumes' : '   space pauses (with the box empty)'}
       </Text>
       <Box flexDirection="column">
         <Text color={C.dim}>

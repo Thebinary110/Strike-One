@@ -360,8 +360,17 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
           setTab(6);
           if (!arg[0]) { show(c, `usage: /${c} <${c === 'timeline' ? 'case id' : 'transaction id'}>`); return; }
           show(`${c} ${arg[0]}`, 'narrating - every claim will be validated against the evidence contract...', true);
-          const r = await rpc.call('ai', {cmd: c, target: arg[0]});
-          show(`${c} ${arg[0]}`, r.text ?? r.error_text ?? '(no output)');
+          try {
+            const r = await rpc.call('ai', {cmd: c, target: arg[0]});
+            show(`${c} ${arg[0]}`, r.text ?? r.error_text ?? '(no output)');
+          } catch (e: any) {
+            if (/not found/.test(String(e?.message ?? e))) {
+              // 'why is the blocklist empty' - a sentence, not an id
+              show(raw, 'not a transaction id - treating it as a question...', true);
+              const r2 = await rpc.call('chat', {question: raw});
+              show(raw, r2.text ?? r2.error_text ?? '(no answer)');
+            } else throw e;
+          }
           return;
         }
         case 'evidence': {
@@ -401,10 +410,16 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
           show('setup', r.text);
           return;
         }
-        default:
+        default: {
+          // not a command -> a question, Claude-Code style. The engine
+          // hands the model the session's own numbers as a hashed
+          // contract; the validator still gates every figure it says.
           setTab(6);
-          show(raw, `unknown command: /${c}\n\ncommands: audit [n] . capacity n . route . policy k=v . stream . case [id]\nwhy <txn> . timeline <case> . compare <txn> . evidence <cmd> <id> . provider\nsource <path> . example <name> . onboard . setup . help . quit`);
+          show(raw, 'thinking - every number in the answer will be validated...', true);
+          const r = await rpc.call('chat', {question: raw});
+          show(raw, r.text ?? r.error_text ?? '(no answer)');
           return;
+        }
       }
     } catch (e: any) {
       setTab(6);
@@ -477,6 +492,10 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
         setCmdEd(edNew(histIdx.current < 0
           ? '' : h[h.length - 1 - histIdx.current]));
       }
+      return;
+    }
+    if (input === ' ' && cmdEd.text === '' && tab === 4) {
+      setPaused(v => !v);
       return;
     }
     if ((key.leftArrow || key.rightArrow) && cmdEd.text === '') {
@@ -579,7 +598,7 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
               {cmdEd.text === '' ? (
                 <Text color={C.dim}>{wiz
                   ? ' onboarding in progress above - esc aborts it'
-                  : ' try: audit 50 · why <txn> · onboard <file> · help'}
+                  : ' type a command (audit 50 · why <txn> · help) or just ask a question'}
                 </Text>
               ) : null}
             </Box>

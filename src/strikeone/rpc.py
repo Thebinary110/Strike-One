@@ -338,6 +338,112 @@ class Session:
                         "stores the env var's name, not its value)\n\n"
                         + provider.chain_text()}
 
+    def chat(self, p):
+        """Free-form questions from the TUI's input box, Claude-Code
+        style. Same discipline as every AI feature: the engine builds an
+        evidence contract from the CURRENT session's already-computed
+        results, the model narrates it, and the citation validator drops
+        any number or decision word the contract does not vouch for."""
+        from strikeone.ai import aiconfig
+        cfg = aiconfig.AIConfig.load()
+        if cfg is None:
+            return {"disabled": True, "text":
+                    "AI is disabled (the default), so free questions are "
+                    "off. Enable once:\n  setup ollama <model>\nCommands "
+                    "keep working without it - type help."}
+        contract = self._overview_contract()
+        from strikeone.ai import validator as val_mod
+        from strikeone.ai.commands import SYSTEM_PROMPT
+        from strikeone.ai.providers import ProviderError
+        import json as _json
+        question = str(p.get("question", ""))[:500]
+        user = ("Task: Answer the user's question about this dataset and "
+                "the evaluation results, using ONLY the evidence. If the "
+                "evidence cannot answer it, say so in a SUMMARY line "
+                "without digits and point at a command (audit, route, "
+                "case <id>, why <txn>) that would.\n\n"
+                "The evidence contract (your ONLY source of facts):\n"
+                + _json.dumps(contract, indent=2)
+                + "\n\nThe user's question: " + question)
+        try:
+            reply = cfg.build().narrate(SYSTEM_PROMPT, user)
+        except ProviderError as e:
+            return {"error_text": f"AI provider unavailable\n{e}\n"
+                    "Commands keep working."}
+        v = val_mod.validate(reply.text, contract)
+        rendered = val_mod.render(v, contract, reply.model,
+                                  reply.provider_label)
+        return {"text": rendered, "model": reply.model,
+                "validity": v.validity,
+                "hash": contract["evidence_hash"]}
+
+    def _overview_contract(self) -> dict:
+        """The current session's headline numbers as a hashed, citable
+        evidence contract (schema v1.0; command 'chat'). No raw rows."""
+        self._need()
+        from strikeone.ai import evidence as ev
+        meta = self.meta({})
+        items = []
+
+        def add(feature, value, source, baseline=None):
+            items.append({"id": f"S{len(items) + 1}", "feature": feature,
+                          "value": value, "baseline": baseline,
+                          "source": source})
+
+        add("rows", int(meta["rows"]), "loaded dataset")
+        add("days", float(meta["days"]), "timestamp span")
+        add("entities", int(meta["entities"]), "distinct entity keys")
+        add("label_delay_days", float(meta["delay"]),
+            "declared label maturity assumption")
+        if meta.get("has_label"):
+            add("labelled_fraud_rows", int(meta["positives"]),
+                "label column")
+            add("fraud_cases", int(meta["episodes"]),
+                "entities' first labelled transactions (episodes)")
+            aud = self.audit({})
+            st, bl = aud["stats"], aud["blocklist"]
+            if st.get("stickiness") is not None:
+                add("label_stickiness_x_base_rate",
+                    round(float(st["stickiness"]), 1),
+                    "P(label | earlier label on entity) / base rate")
+            add("blocklist_recovered_share",
+                round(float(bl["recovered_share"]), 4),
+                f"plain blocklist at the {meta['delay']:g}-day delay")
+            add("blocklist_flags", int(bl.get("comparison_n") or 0),
+                "transactions a standing blocklist would flag")
+            if aud.get("headline"):
+                add("average_precision",
+                    round(float(aud["headline"]["ap"]), 4),
+                    "the mapped score column")
+                add("roc_auc", round(float(aud["headline"]["roc_auc"]), 4),
+                    "the mapped score column")
+                pr = next(x for x in aud["budgets"] if x["primary"])
+                add("reviews_per_day", int(pr["per_day"]),
+                    "primary review budget")
+                add("headline_recall_at_budget",
+                    round(float(pr["headline_recall"]), 4),
+                    "fraud transactions caught at the primary budget")
+                add("first_hit_recall_at_budget",
+                    round(float(pr["fs_recall"]), 4),
+                    "fraud CASES caught at their first labelled "
+                    "transaction")
+                add("false_positives_at_budget",
+                    int(pr["false_positives"]),
+                    "good customers flagged at the primary budget")
+                add("blocklist_coverable_share_of_hits",
+                    round(float(pr["blocklist_coverable_rate"]), 4),
+                    "correct alerts a standing blocklist would also "
+                    "have covered")
+        contract = {
+            "contract_version": ev.CONTRACT_VERSION, "evidence_hash": "",
+            "command": "chat", "transaction_id": None, "case_id": None,
+            "decision": None, "lane": None, "fraud_probability": None,
+            "episode_state": "n/a (dataset overview)",
+            "evidence": items, "policy": None,
+        }
+        contract["evidence_hash"] = ev.canonical_hash(contract)
+        return {k: contract[k] for k in ev.TOP_KEYS}
+
     def provider_chain(self, _p):
         from strikeone.ai import aiconfig
         cfg = aiconfig.AIConfig.load()
@@ -452,6 +558,7 @@ def main():
                "onboard_finish": sess.onboard_finish,
                "onboard_abort": sess.onboard_abort,
                "ai_setup": sess.ai_setup,
+               "chat": sess.chat,
                "ping": lambda _p: {"pong": True}}
     for line in sys.stdin:
         line = line.strip()
