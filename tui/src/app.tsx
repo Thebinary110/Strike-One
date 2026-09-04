@@ -164,14 +164,14 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
     return () => clearInterval(t);
   }, [motion, paused, tab, sess.stream]);
 
-  // case unfolding
+  // case unfolding (space pauses it, same as the stream)
   useEffect(() => {
     if (!sess.caseData) return;
     if (!motion) { setReveal(sess.caseData.rows.length); return; }
-    if (reveal >= sess.caseData.rows.length) return;
+    if (paused || reveal >= sess.caseData.rows.length) return;
     const t = setTimeout(() => setReveal(r => r + 1), 240);
     return () => clearTimeout(t);
-  }, [reveal, sess.caseData, motion]);
+  }, [reveal, sess.caseData, motion, paused]);
 
   function econAdjust(dir: 1 | -1) {
     const meta = [['m', 0.01], ['a', 0.005], ['e', 0.01], ['c_h', 2.5]] as const;
@@ -316,7 +316,7 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
         case 'quit': case 'exit': case 'q': exit(); return;
         case '1': case '2': case '3': case '4': case '5': case '6':
         case '7': setTab(Number(c) - 1); return;
-        case 'pause': setPaused(v => !v); setTab(4); return;
+        case 'pause': setPaused(v => !v); return;
         case 'next': void nextCase(); setTab(5); return;
         case 'example': load({example: arg[0] ?? 'synthetic'}); return;
         case 'source': case 'open':
@@ -494,7 +494,7 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
       }
       return;
     }
-    if (input === ' ' && cmdEd.text === '' && tab === 4) {
+    if (input === ' ' && cmdEd.text === '' && (tab === 4 || tab === 5)) {
       setPaused(v => !v);
       return;
     }

@@ -291,7 +291,21 @@ export const Econ = ({s, params, sel, width}: {s: Session; params: any;
 // ---------------------------------------------------------------- STREAM
 export const Stream = ({s, shownRows, paused, width}: {s: Session;
                         shownRows: any[]; paused: boolean; width: number}) => {
-  if (!s.stream) return <NeedData />;
+  if (!s.stream) {
+    if (s.status === 'ready' && s.meta && !s.meta.has_score)
+      return (
+        <Box flexDirection="column" gap={1}>
+          <Text bold>Nothing to replay: this file has no score column.</Text>
+          <Text color={C.dim} wrap="wrap">The stream replays YOUR scorer's
+ decisions transaction by transaction. This dataset was mapped without a
+ score, so there are no decisions to show - the CASE panel (6) still
+ animates each fraud case from the labels alone. To see the stream,
+ score the file with your model and remap it (onboard again, or
+ --map score={'<column>'}).</Text>
+        </Box>
+      );
+    return <NeedData />;
+  }
   return (
     <Box flexDirection="column" gap={1}>
       <Text color={C.dim}>
@@ -357,7 +371,8 @@ export const Case = ({s, reveal, width}: {s: Session; reveal: number;
     <Box flexDirection="column" gap={1}>
       <Text bold>Customer identity {c.entity}
         <Text color={C.dim}>  {rows.length} transactions,
-        {' '}{frauds.length} fraudulent   |   n = next case</Text></Text>
+        {' '}{frauds.length} fraudulent   |   space pause · 'next' for
+ another case</Text></Text>
       <Box flexDirection="column">
         {fsX !== null && (
           <Text>
