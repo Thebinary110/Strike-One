@@ -181,14 +181,17 @@ export const Route = ({s, width}: {s: Session; width: number}) => {
       )}
       {prim && (
         <Sentence width={width} text={
-          prim.lift > 1.05
+          (prim.lift === null ? prim.fs_recall_on > 0 : prim.lift > 1.05)
             ? `At ${fmt(prim.per_day)} alerts/day the same scorer stops ` +
               `${pct(prim.fs_recall_off, 1)} of fraud cases alone and ` +
               `${pct(prim.fs_recall_on, 1)} with the blocklist lane in front ` +
-              `of it: ${prim.lift === Infinity ? 'from zero' : prim.lift.toFixed(2) + 'x'}` +
-              ` the first-hit catches, zero model changes.`
+              `of it: ${prim.lift === null ? 'catches from zero'
+                        : prim.lift.toFixed(2) + 'x the first-hit catches'}` +
+              `, zero model changes.`
             : `MEASURED: the blocklist lane adds nothing on this book ` +
-              `(lift ${prim.lift.toFixed(2)}x at ${fmt(prim.per_day)}/day)` +
+              `(lift ${prim.lift === null ? 'undefined - no first hits ' +
+               'either way' : prim.lift.toFixed(2) + 'x'} at ` +
+              `${fmt(prim.per_day)}/day)` +
               (typeof r.lane1.legit_blocked === 'number'
                 ? ` and blocks ${fmt(r.lane1.legit_blocked)} legitimate ` +
                   `transactions. Fraud here does not recur per entity, so ` +
@@ -298,12 +301,14 @@ export const Stream = ({s, shownRows, paused, width}: {s: Session;
       </Text>
       <Box flexDirection="column">
         <Text color={C.dim}>
-          {'   day     amount   route            '}
+          {'   id             day     amount   route            '}
+          {'(ask about any row: why <id>)'}
         </Text>
         {shownRows.map((r, i) => (
           <Text key={i} bold={r.caught_fs}
                 backgroundColor={r.caught_fs && !process.env.NO_COLOR
                   ? '#0d3524' : undefined}>
+            {`  ${String(r.id ?? '').slice(0, 13).padEnd(13)}`}
             {`  ${r.day.toFixed(2).padStart(6)}  ${r.amount.toFixed(2).padStart(9)}  `}
             {r.lane === 'auto-block'
               ? <Text color={C.harm}>auto-block, no review</Text>
@@ -358,6 +363,12 @@ export const Case = ({s, reveal, width}: {s: Session; reveal: number;
           <Text>
             {' '.repeat(Math.max(0, Math.min(fsX - 8, w - 18)))}
             <Text color={C.harm} bold>THE FIRST HIT</Text>
+            <Text color={C.dim}>
+              {(() => {
+                const f = rows.find(r => r.role === 1);
+                return f?.id ? `  id ${f.id}  (try: why ${f.id})` : '';
+              })()}
+            </Text>
           </Text>
         )}
         <Text>
@@ -388,7 +399,7 @@ export const Case = ({s, reveal, width}: {s: Session; reveal: number;
         {shown.slice(-6).map((r, i) => (
           <Text key={i} color={r.role === 1 ? C.harm
             : r.role === 2 ? C.waste : C.dim}>
-            {`  day ${r.day.toFixed(2).padStart(6)}   amount ${r.amount.toFixed(2).padStart(9)}   `}
+            {`  ${String(r.id ?? '').slice(0, 13).padEnd(13)} day ${r.day.toFixed(2).padStart(6)}   amount ${r.amount.toFixed(2).padStart(9)}   `}
             {r.role === 1 ? 'THE FIRST HIT'
               : r.role === 2 ? 'later attempt, blocklist-coverable'
               : 'normal purchase'}

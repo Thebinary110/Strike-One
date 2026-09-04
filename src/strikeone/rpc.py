@@ -382,6 +382,7 @@ class Session:
         rows = []
         for i in events[start:start + limit]:
             rows.append({
+                "id": str(a["tb"][i]),
                 "day": round(float((a["t"][i] - a["day0"]) / 86400), 2),
                 "amount": round(float(a["amt"][i]), 2),
                 "entity": str(a["ent"][i]),
@@ -427,7 +428,8 @@ class Session:
         a = self.arrays()
         eid = p["entity"]
         idx = np.flatnonzero(a["ent"] == eid)
-        rows = [{"day": round(float((a["t"][i] - a["day0"]) / 86400), 2),
+        rows = [{"id": str(a["tb"][i]),
+                 "day": round(float((a["t"][i] - a["day0"]) / 86400), 2),
                  "amount": round(float(a["amt"][i]), 2),
                  "label": int(a["y"][i]) if a["y"] is not None else None,
                  "role": int(a["roles"][i]) if a["y"] is not None else 0}
