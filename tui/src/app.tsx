@@ -321,9 +321,21 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
 
   async function wizConsent(w: Wiz, yes: boolean) {
     const t = w.queue[w.idx];
-    if (!yes) { setWiz({...w, phase: 'ask', ed: edNew(), pendingSrc: undefined,
-                        warnings: undefined,
-                        msg: 'declined; pick another column'}); return; }
+    if (!yes) {
+      // clear the proposal, or plain enter would resubmit the SAME
+      // rejected column and retrigger the same warning forever - this
+      // was the "it keeps asking about score" loop.
+      const row = w.rows.find((r: any) => r.target === t);
+      const required = row?.required;
+      const rows = w.rows.map((r: any) => r.target === t
+        ? {...r, source: null, confidence: 0, competing: []} : r);
+      setWiz({...w, rows, phase: 'ask', ed: edNew(), pendingSrc: undefined,
+             warnings: undefined,
+             msg: required
+               ? `declined; ${t} is required - type a different column`
+               : `declined; ${t} is optional - press enter to leave it unmapped, or type a different column`});
+      return;
+    }
     setWiz({...w, busy: true, busyText: 'recording your answer...'});
     try {
       await rpc.call('onboard_accept', {target: t, source: w.pendingSrc});
