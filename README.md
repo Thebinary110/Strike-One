@@ -279,6 +279,51 @@ editor - block cursor, arrow keys, ctrl-a/e/u/w, up/down for history,
 paste-safe. Mouse click-to-cursor is opt-in (`mouse on`); by default
 your terminal's native text selection and copy/paste work normally.
 
+### End to end: the frozen example, wired to a local model
+
+`strikeone tui --example synthetic` needs nothing but `pip install
+strikeone`. The frozen IEEE-CIS example is different — it reads
+`data/processed/` and `models/` from wherever strikeone's own source
+lives on disk, and the PyPI wheel never vendors that data. So it needs
+an **editable install of this checkout**, not a plain `pip install
+strikeone`:
+
+```bash
+# 1. clone and install editable - keeps strikeone pointed at THIS repo,
+#    where the frozen data/models actually live
+git clone https://github.com/Thebinary110/Strike-One && cd Strike-One
+pip install -e .
+
+# 2. a local model, if you don't already have one running
+curl -fsSL https://ollama.com/install.sh | sh   # or: brew install ollama
+ollama pull qwen3:8b                            # any instruct model works
+
+# 3. connect it - writes .strikeone-ai.toml, no secret ever stored
+strikeone ai setup --provider ollama --model qwen3:8b --think off
+strikeone ai provider
+#   Provider: Ollama (local)   Model: qwen3:8b
+#   Endpoint: http://localhost:11434
+#   Evidence leaves this machine: NO
+
+# 4. launch
+strikeone tui
+```
+
+Inside the TUI: type `example ieee-cis`, wait for `contract check:
+PASS`, then `2` for the audit (47% headline recall vs **54% of cases
+caught at their first labelled transaction**, same budget). Press `7`
+for the AI tab and try it live, citations included:
+
+```
+why 3485325               # one decision, cited (6 of 6 claims validated)
+timeline 10616_143_170    # one case, including a blocklist-coverable hit
+```
+
+Building the frozen example yourself instead of using what ships in the
+repo (a longer path, only needed to reproduce the study from raw data):
+`scripts/download_data.sh` through `scripts/stage6_prepare_replay.py`,
+chained in [`FINDINGS.md`](https://github.com/Thebinary110/Strike-One/blob/main/FINDINGS.md).
+
 ## The AI layer (optional, off by default)
 
 Narration, not intelligence: the engine makes every decision and computes
