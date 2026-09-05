@@ -560,3 +560,18 @@ def test_rpc_stream_raw_fallback_without_score(tmp_path, monkeypatch):
     assert out.get("raw") is True
     assert len(out["rows"]) == 10
     assert out["rows"][0]["id"] and "day" in out["rows"][0]
+
+
+def test_rpc_case_raises_on_unknown_entity(tmp_path, monkeypatch):
+    """case cc_num" typing the column name instead of a real value must
+    raise a clean, catchable error - not return an empty payload that
+    later crashes the TUI's render on rows[0]."""
+    from strikeone import contract as C
+    from strikeone import examples
+    from strikeone.rpc import Session
+
+    monkeypatch.chdir(tmp_path)
+    raw, m = examples.resolve("synthetic")
+    s = Session(); s.df = C.apply_mapping(raw, m); s.mapping = m; s._arrays = None
+    with pytest.raises(ValueError, match="not found"):
+        s.case({"entity": "cc_num"})
