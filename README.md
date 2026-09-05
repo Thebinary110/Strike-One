@@ -378,17 +378,46 @@ number reported in this repo's results.
 4. All comparisons are budget-matched; nothing is compared at different
    alert counts.
 
-## How this maps to the track brief
+## How this maps to Track 02 — AI Risk Manager
 
-| the track asks for | where it is |
+> "Build a working detector, verifier or auto-responder for one class of
+> loss, with measured precision and recall on a held-out test set."
+> **The bar:** honest metrics including false-positive cost. Strictly
+> defense-only.
+
+| the bar, verbatim | this submission |
 |---|---|
-| pick one class of loss | card-not-present fraud chargebacks (IEEE-CIS) |
-| a working detector | the reference detector A2, frozen by SHA-256 before the holdout opened (`reports/stage4/shipped_system_frozen.json`, `b632a136…`) |
-| an automated responder | the approve / step-up / block policy (`strikeone policy`), plus the blocklist lane (`strikeone route`) |
-| measured precision/recall | per review budget, on the sealed holdout: `reports/stage7/`, C1–C12 in `canonical_comparisons.md` |
-| a held-out evaluation set | days 151–182, SHA-256-sealed; **two accesses, each pre-registered and logged** (`reports/holdout_access.log`) |
-| the cost of false positives | first-class: FP counts at every budget, lane-1 legitimate blocks counted, declared economic ranges with a published sensitivity grid |
-| defense only | the tool evaluates and routes; nothing here probes, evades, or attacks anything |
+| one class of loss | card-not-present fraud chargebacks (IEEE-CIS) — declared once, never widened |
+| a working detector | reference detector A2, frozen by SHA-256 **before** the holdout opened (`reports/stage4/shipped_system_frozen.json`, `b632a136…`) |
+| an auto-responder | the approve / step-up / block policy (`strikeone policy`) + the blocklist lane (`strikeone route`) — a real decision, not a score |
+| measured P/R on a held-out test set | sealed holdout (SHA-256), opened **twice**, both times against a plan pre-registered and committed *before* opening (`reports/holdout_access.log`, `holdout_prediction.md`); full figures in `reports/stage7/` and C1–C13 in `canonical_comparisons.md` |
+| honest metrics incl. false-positive cost | FP counts at every review budget; a full cost model with declared ranges and a sensitivity grid — and when our *first* cost claim ("81/81") turned out to be near-tautological, we withdrew it and rebuilt it out-of-sample, decomposed by cause, with per-corner confidence intervals, rather than keep the flattering number |
+| strictly defense-only | evaluates and routes; no exploit code, no adversarial-generation capability, nothing here can probe or attack anything |
+
+**Which EXAMPLE DIRECTION is this?** None of the four literally (chargeback
+evidence responder / return-risk scorer / fraud-spike detector /
+abuse-ring sentinel) — the actual contribution sits one level up: a
+measurement discipline that catches when a detector's *own* reported
+precision/recall is misleading (see "The claim" above), packaged as a
+tool any of those four directions could run against their own labelled
+data and their own model. The reference detector (A2) is the proof that
+the discipline works on a real, held-out-measured system, not a
+demonstration in search of a use.
+
+**On generalization, stated plainly, because the bar says "one class of
+loss," not "every dataset":** the measured finding is proven on IEEE-CIS
+specifically. We stress-tested the *mechanism* against two further real
+datasets outside the frozen study (Sparkov card-fraud, PaySim mobile-money
+fraud) and found label propagation — the condition the whole effect
+depends on — was much weaker there (stickiness 1.2x and 0.95x
+respectively, vs IEEE-CIS's own measured strength) than on IEEE-CIS,
+where the host's own aggressive relabeling rule may be doing more of the
+work than a "typical" chargeback label would. `strikeone`'s own
+stickiness guard (`strikeone check`/`audit`) correctly detects this and
+refuses to headline first-hit recall when it doesn't apply, rather than
+overclaiming on data it shouldn't. That refusal is not a limitation
+found late — it is a designed safety property, now confirmed against
+data it was never tuned on.
 
 ## Limitations
 
