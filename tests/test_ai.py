@@ -306,3 +306,31 @@ def test_provider_independence_citation_validity(synth):
           f"{len(results)} models from {len(fams)} families")
     for name, (vc, tc, answered) in results.items():
         print(f"  {name}: {vc}/{tc} (answered by {answered})")
+
+
+def test_render_explains_zero_validated_claims(synth):
+    """When every line the model wrote fails validation (the reported
+    '0 of 0 claims validated, nothing shown' scenario), the render must
+    say plainly that nothing survived - not just silently show the
+    footer with no explanation."""
+    df, m = synth
+    con = E.build_why(df, m, _some_fraud_txn(df))
+    v = V.validate("SUMMARY: it looks like 3 prior incidents.\n"
+                   "SUMMARY: about 12 days ago.", con)
+    assert v.valid_claims == 0 and not v.lines
+    out = V.render(v, con, "some-model", "test")
+    assert "no citable content" in out
+    assert f"evidence why {con['transaction_id']}" in out
+    assert "0 of 0 claims validated" in out
+
+
+def test_render_chat_zero_claims_suggests_a_narrower_question(synth):
+    df, m = synth
+    con = {"contract_version": "1.0", "evidence_hash": "x" * 12,
+           "command": "chat", "transaction_id": None, "case_id": None,
+           "decision": None, "lane": None, "fraud_probability": None,
+           "episode_state": "n/a", "evidence": [], "policy": None}
+    v = V.validate("SUMMARY: there were 5 of them.", con)
+    out = V.render(v, con, "some-model", "test")
+    assert "ask a narrower question" in out
+    assert "evidence chat" not in out

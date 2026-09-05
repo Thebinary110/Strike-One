@@ -173,6 +173,20 @@ def validate(raw_text: str, contract: dict) -> Validated:
 def render(v: Validated, contract: dict, model: str, provider_label: str,
            width: int = 74) -> str:
     L = []
+    if not v.lines:
+        # Fail-closed did its job (nothing unvalidated reached the user),
+        # but silence with no explanation reads as a crash, not a refusal.
+        # Say plainly that nothing survived and offer a way forward that
+        # needs no model at all.
+        cmd = contract.get("command", "this")
+        tid = contract.get("transaction_id") or contract.get("case_id") or ""
+        L.append("  ⚠ the model's reply had no citable content this "
+                 "time (nothing shown is a rejection, not a crash).")
+        if cmd in ("why", "timeline", "compare") and tid:
+            L.append(f"  try again, or see the same facts with no model: "
+                     f"evidence {cmd} {tid}")
+        else:
+            L.append("  try again, or ask a narrower question.")
     for line in v.lines:
         while len(line) > width:
             cut = line.rfind(" ", 0, width)
