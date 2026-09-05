@@ -463,6 +463,8 @@ export type Wiz = {
   ed: Ed; tomlExists?: boolean; aiNote?: string | null;
   pendingSrc?: any; warnings?: string[]; delay?: string; msg?: string;
   labelSet: boolean;
+  busy?: boolean; busyText?: string;    // a network call is in flight -
+  //   no input is accepted and the SAME question never silently reappears
 };
 
 export const Wizard = ({w, width}: {w: Wiz; width: number}) => {

@@ -62,6 +62,12 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
   const hist = useRef<string[]>([]);
   const histIdx = useRef(-1);
   const [wiz, setWiz] = useState<Wiz | null>(null);
+  const [busyTick, setBusyTick] = useState(0);
+  useEffect(() => {
+    if (!wiz?.busy) return;
+    const t = setInterval(() => setBusyTick(x => x + 1), 500);
+    return () => clearInterval(t);
+  }, [wiz?.busy]);
   const rpc = useMemo(() => new Rpc(), []);
   const econTimer = useRef<any>(null);
 
@@ -79,6 +85,32 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
   // don't need native selection; 'mouse off' (the default) restores it.
   const [mouseOn, setMouseOn] = useState(false);
   const CMD_TEXT_X = 6;   // app pad + bar border + bar pad + '/ ' prompt
+  // A crashed earlier run (or ctrl+C, or a killed terminal tab) can leave
+  // the TERMINAL EMULATOR itself stuck believing mouse-reporting is still
+  // on - that is state the terminal holds, not this process, so a later,
+  // perfectly clean run inherits it and copy/paste stays broken even
+  // though this session never asked for mouse mode. Force every mouse
+  // mode off, unconditionally, before this session decides anything.
+  useEffect(() => {
+    if (process.stdin.isTTY !== true) return;
+    stdout.write('\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l');
+  }, []);
+  // Belt-and-suspenders: guarantee the terminal is reset on EVERY exit
+  // path - normal quit, ctrl+C/SIGTERM, or an uncaught exception - not
+  // only the clean-unmount path React effects cover. 'exit' fires
+  // synchronously right before the process dies, whatever killed it.
+  useEffect(() => {
+    if (process.stdin.isTTY !== true) return;
+    const reset = () => {
+      try {
+        process.stdout.write('\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?25h');
+      } catch { /* best effort during shutdown */ }
+    };
+    process.on('exit', reset);
+    process.on('SIGINT', () => { reset(); process.exit(130); });
+    process.on('SIGTERM', () => { reset(); process.exit(143); });
+    return () => { process.off('exit', reset); };
+  }, []);
   useEffect(() => {
     if (process.stdin.isTTY !== true) return;
     if (mouseOn) stdout.write('\x1b[?1000h\x1b[?1006h');
@@ -263,24 +295,27 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
     try {
       if (!src || src === 'skip') {
         if (row?.required) { setWiz({...w, ed: edNew(), msg: `${t} is required; type a column name (esc aborts)`}); return; }
+        setWiz({...w, busy: true, busyText: 'recording your answer...'});
         await rpc.call('onboard_skip', {target: t});
-        await wizAdvance(w, w.labelSet);
+        await wizAdvance({...w, busy: false}, w.labelSet);
         return;
       }
+      setWiz({...w, busy: true, busyText: `checking '${src}' against the data...`});
       const v = await rpc.call('onboard_validate', {target: t, source: src});
       if (v.hard?.length) {
-        setWiz({...w, ed: edNew(), msg: `REJECTED: ${v.hard.join('; ')}`});
+        setWiz({...w, busy: false, ed: edNew(), msg: `REJECTED: ${v.hard.join('; ')}`});
         return;
       }
       if (v.soft?.length) {
-        setWiz({...w, phase: 'consent', pendingSrc: v.source,
+        setWiz({...w, busy: false, phase: 'consent', pendingSrc: v.source,
                 warnings: v.soft, ed: edNew()});
         return;
       }
+      setWiz({...w, busy: true, busyText: 'recording your answer...'});
       await rpc.call('onboard_accept', {target: t, source: v.source});
-      await wizAdvance(w, w.labelSet || t === 'label');
+      await wizAdvance({...w, busy: false}, w.labelSet || t === 'label');
     } catch (e: any) {
-      setWiz({...w, ed: edNew(), msg: String(e?.message ?? e)});
+      setWiz({...w, busy: false, ed: edNew(), msg: String(e?.message ?? e)});
     }
   }
 
@@ -289,12 +324,14 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
     if (!yes) { setWiz({...w, phase: 'ask', ed: edNew(), pendingSrc: undefined,
                         warnings: undefined,
                         msg: 'declined; pick another column'}); return; }
+    setWiz({...w, busy: true, busyText: 'recording your answer...'});
     try {
       await rpc.call('onboard_accept', {target: t, source: w.pendingSrc});
-      await wizAdvance({...w, pendingSrc: undefined, warnings: undefined},
-                       w.labelSet || t === 'label');
+      await wizAdvance({...w, busy: false, pendingSrc: undefined,
+                        warnings: undefined}, w.labelSet || t === 'label');
     } catch (e: any) {
-      setWiz({...w, phase: 'ask', ed: edNew(), msg: String(e?.message ?? e)});
+      setWiz({...w, busy: false, phase: 'ask', ed: edNew(),
+             msg: String(e?.message ?? e)});
     }
   }
 
@@ -304,12 +341,19 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
       setWiz({...w, ed: edNew(), msg: 'delay must be a number of days'});
       return;
     }
-    setWiz({...w, phase: 'delay', ed: edNew(),
-             msg: 'validating the full file and writing the mapping...'});
+    // this is the step that answered was disappearing into: validating a
+    // large file can take 20-30s, and re-showing the SAME question with an
+    // empty box looked exactly like being asked again. 'busy' replaces the
+    // question with a plain working message until the write completes.
+    setWiz({...w, busy: true,
+           busyText: overwrite ? 'overwriting the existing mapping...'
+                                : 'validating the full file and writing '
+                                  + 'the mapping...'});
     try {
       const r = await rpc.call('onboard_finish', {delay, overwrite});
       if (r.needs_overwrite) {
-        setWiz({...w, phase: 'overwrite', delay: String(delay), ed: edNew()});
+        setWiz({...w, busy: false, phase: 'overwrite',
+               delay: String(delay), ed: edNew()});
         return;
       }
       setWiz(null);
@@ -319,7 +363,7 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
           String.fromCharCode(10) + String.fromCharCode(10) +
           `load it now: /source ${w.source}`}}));
     } catch (e: any) {
-      setWiz({...w, msg: String(e?.message ?? e)});
+      setWiz({...w, busy: false, ed: edNew(), msg: String(e?.message ?? e)});
     }
   }
 
@@ -476,6 +520,8 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
 
   useInput((input, key) => {
     if (wiz) {
+      if (wiz.busy) return;   // a network call is in flight; no double-fire,
+      //                          no abort mid-write
       if (key.escape) {
         void rpc.call('onboard_abort');
         setWiz(null);
@@ -638,22 +684,36 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
         // it hosts the wizard's own question, never a second inert copy.
         const inWizEditor = wiz && (wiz.phase === 'ask' || wiz.phase === 'delay');
         const activeEd = inWizEditor ? wiz.ed : cmdEd;
+        const busy = wiz?.busy === true;
+        const dots = '.'.repeat((busyTick % 3) + 1).padEnd(3);
         return (
           <Box flexDirection="column">
             <Box borderStyle="round"
-                 borderColor={wiz ? C.waste : C.accent} paddingX={1}>
-              <Text bold color={wiz ? C.waste : C.accent}>
-                {wiz ? '? ' : '> '}
-              </Text>
-              {wiz && !inWizEditor ? (
-                <Text bold>{wizPrompt(wiz)}</Text>
+                 borderColor={busy ? C.accent : wiz ? C.waste : C.accent}
+                 paddingX={1}>
+              {busy ? (
+                // NEVER re-show the same question here: that is exactly
+                // what looked like "stuck, ask again" during a 20-30s
+                // validation of a large file.
+                <Text color={C.accent}>
+                  {'● '}{wiz!.busyText ?? 'working'}{dots}
+                  {' (' + Math.floor(busyTick / 2) + 's)'}
+                </Text>
+              ) : wiz && !inWizEditor ? (
+                <>
+                  <Text bold color={C.waste}>{'? '}</Text>
+                  <Text bold>{wizPrompt(wiz)}</Text>
+                </>
               ) : (
                 <>
+                  <Text bold color={wiz ? C.waste : C.accent}>
+                    {wiz ? '? ' : '> '}
+                  </Text>
                   {wiz ? <Text color={C.dim}>{wizPrompt(wiz)}</Text> : null}
                   <EditorText ed={activeEd} />
                 </>
               )}
-              {!wiz && cmdEd.text === '' ? (
+              {!busy && !wiz && cmdEd.text === '' ? (
                 <Text color={C.dim}>
                   {' type a command (audit 50 · why <txn> · help) or just ask a question'}
                 </Text>
@@ -665,7 +725,9 @@ export const App = ({initialExample, initialSource, frameTab, motion}: {
               </Text>
             ))}
             <Text color={C.dim}>
-              {wiz
+              {busy
+                ? 'please wait - large files can take a while to validate; nothing is stuck'
+                : wiz
                 ? (inWizEditor ? 'enter submit · esc aborts the whole onboarding, nothing written'
                               : 'y / n · esc aborts the whole onboarding, nothing written')
                 : (note ?? 'enter run · tab complete / panels · up-down history · mouse off by default (see: mouse on) · q + enter quits')}
