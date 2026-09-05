@@ -58,6 +58,8 @@ literature we run backwards: [`reports/PRIOR_ART.md`](https://github.com/Thebina
 pip install strikeone            # the Python core: check/audit/route/policy/ai
 ```
 
+PyPI: [pypi.org/project/strikeone](https://pypi.org/project/strikeone/)
+
 Or from source (needed for the TUI and the frozen IEEE-CIS study):
 
 ```bash
@@ -447,6 +449,25 @@ data it was never tuned on.
   — including the predictions that missed, self-caught bugs documented,
   negative results published. Read [`FINDINGS.md`](https://github.com/Thebinary110/Strike-One/blob/main/FINDINGS.md) and
   [`reports/`](https://github.com/Thebinary110/Strike-One/blob/main/reports/).
+
+## Build challenges
+
+- **A pandas-3 upgrade silently nulled the entity ID on 11.4% of rows**,
+  and every null-entity fraud counted as its own "first catch" instead of
+  joining the case it actually belonged to — inflating our own headline
+  metric by ~55%. Caught by an unrelated audit script checking a
+  different failure mode entirely, not by an outside reviewer. Fixed,
+  every dependent number rebuilt, and the original wrong numbers left in
+  git history rather than quietly rewritten.
+- **An early "81 of 81" cost-policy claim was withdrawn.** It compared
+  cost-aware routing to fixed thresholds tuned and judged on the same
+  validation slice — a textbook selection-on-evaluation error (Cawley &
+  Talbot, JMLR 2010), not a meaningful result. Rebuilt against holdout
+  rows the policy had never seen; the edge held, for a smaller and more
+  defensible reason than first claimed.
+- Neither was caught by a reviewer. Both were caught because the checks
+  were built before the results were believed — the scariest bugs are
+  the ones that make your numbers look better.
 
 ## Data and license
 
